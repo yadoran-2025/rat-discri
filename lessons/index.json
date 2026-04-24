@@ -1,0 +1,45 @@
+{
+  "dashboard": {
+    "title": "사회교육플랫폼 BOOONG",
+    "subtitle": "돌고 돌아서 본업으로",
+    "logo": "scooter-pictogram"
+  },
+  "lessons": [
+    {
+      "id": "rat-disc-1",
+      "group": "합리적 차별 금지",
+      "title": "1차시: 차별금지가 적용되는 영역",
+      "desc": "편견과 차별의 정의를 배우고 우리 주변의 사례를 탐구합니다."
+    },
+    {
+      "id": "rat-disc-2",
+      "group": "합리적 차별 금지",
+      "title": "2차시: 합리적 차별의 판단 기준",
+      "desc": "어떤 차별이 정당한지, 합리적 차별의 요건을 알아봅니다."
+    },
+    {
+      "id": "family-law-1",
+      "group": "법과 생활",
+      "title": "1차시: 현대 사회와 가족법",
+      "desc": "가족 관계에서 발생하는 법적 문제와 권리를 학습합니다."
+    }
+  ],
+  "tools": [
+    {
+      "id": "block-guide",
+      "type": "guide",
+      "tag": "시스템 가이드",
+      "title": "블록 가이드 갤러리",
+      "desc": "모든 블록 유형의 시각적 예시와 JSON 작성법을 한눈에 확인하세요.",
+      "link": "?lesson=block-guide"
+    },
+    {
+      "id": "print-mode",
+      "type": "print",
+      "tag": "도구",
+      "title": "인쇄용 페이지 생성",
+      "desc": "원하는 시험문제의 코드를 입력하면, A4 크기에 맞게 자동으로 배치하여 출력합니다.",
+      "link": "print.html"
+    }
+  ]
+}
