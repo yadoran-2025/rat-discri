@@ -1,0 +1,105 @@
+{
+  "id": "block-guide",
+  "lessonGroup": "시스템 가이드",
+  "title": "블록 가이드 갤러리",
+  "subtitle": "모든 블록 유형과 작성 방법을 확인하세요",
+  "imageBase": "assets/images/",
+  "prev": null,
+  "next": "rat-disc-1",
+  "sections": [
+    {
+      "id": "intro",
+      "title": "시작하기",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "이 페이지는 **수업용 프리젠터**에서 사용할 수 있는 모든 블록 유형을 보여주는 가이드입니다. 각 블록이 어떻게 렌더링되는지 확인하고 JSON 작성법을 익혀보세요."
+        },
+        {
+          "type": "heading",
+          "text": "1. 기본 텍스트 및 제목 블록"
+        },
+        {
+          "type": "paragraph",
+          "text": "이것은 `paragraph` 블록입니다. 일반적인 텍스트를 입력할 때 사용하며 **굵게** 표시하거나 줄바꿈을 지원합니다."
+        }
+      ]
+    },
+    {
+      "id": "callouts",
+      "title": "콜아웃 (강조 박스)",
+      "blocks": [
+        {
+          "type": "heading",
+          "text": "사례(Case) 및 질문(Question)"
+        },
+        {
+          "type": "case",
+          "label": "사례 1",
+          "text": "이것은 `case` 블록입니다. 주로 수업의 사례를 제시할 때 사용하며 초록색 테두리가 특징입니다.",
+          "sub": "하단에 이렇게 작은 부연 설명을 넣을 수 있습니다.",
+          "answer": {
+            "text": "정답 및 해설입니다. 버튼을 누르면 나타납니다."
+          }
+        },
+        {
+          "type": "question",
+          "prompts": [
+            {
+              "q": "이것은 `question` 블록의 첫 번째 질문입니다.",
+              "note": "질문 하단에 힌트나 노트를 넣을 수 있습니다."
+            }
+          ],
+          "conclusion": "질문 블록의 하단에는 '결론' 영역을 추가할 수 있습니다.",
+          "comments": true
+        }
+      ]
+    },
+    {
+      "id": "concept",
+      "title": "개념 정리",
+      "blocks": [
+        {
+          "type": "concept",
+          "title": "핵심 개념",
+          "body": "`concept` 블록은 수업의 핵심 내용을 요약할 때 사용합니다.",
+          "bullets": [
+            "중요한 포인트 1",
+            "중요한 포인트 2",
+            "이미지도 삽입할 수 있습니다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "title": "미디어 및 레이아웃",
+      "blocks": [
+        {
+          "type": "heading",
+          "text": "이미지 및 텍스트 박스"
+        },
+        {
+          "type": "paragraph",
+          "text": "이미지 대신 `text:##제목\n내용` 형식을 사용하면 아래와 같이 신문 기사 느낌의 텍스트 박스를 띄울 수 있습니다."
+        },
+        {
+          "type": "image-row",
+          "images": [
+            "text:## 가짜 뉴스 주의보\n최근 인터넷을 통해 퍼지는 정보 중에는 사실이 아닌 내용이 많습니다. 출처를 반드시 확인하세요.\n---\n디지털 리터러시 위원회"
+          ]
+        },
+        {
+          "type": "divider"
+        },
+        {
+          "type": "summary",
+          "items": [
+            "가이드의 마지막 블록은 `summary`입니다.",
+            "수업의 마무리에 번호 매기기로 정리할 때 유용합니다."
+          ]
+        }
+      ]
+    }
+  ]
+}

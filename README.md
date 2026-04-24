@@ -1,86 +1,91 @@
-# 수업용 프리젠터
+# 🛵 사회교육플랫폼 BOOONG (Classroom Presenter)
 
-Notion 지도안을 기반으로 한 수업용 웹 프리젠터.
-교실 빔프로젝터에 띄워놓고 키보드로 진행하며, 답은 숨김 처리되어 교사가 원할 때 공개합니다.
+Notion 지도안을 기반으로 한 수업용 웹 프리젠터입니다. 
+교실 빔프로젝터에 최적화된 UI를 제공하며, 실시간 답변 공유 및 인터랙티브한 수업 진행을 지원합니다.
 
-## 구조
+## 주요 특징
+- **대시보드 메인**: 모든 수업 목록과 도구를 한눈에 관리하는 대시보드 제공.
+- **실시간 피드백**: Firebase를 연동하여 학생들의 답변을 실시간으로 수집 및 공유.
+- **모듈화된 디자인**: 스타일시트를 기능별로 분리하여 유지보수성 극대화.
+- **멀티 미디어 지원**: 이미지, 유튜브 영상, 신문 기사 스타일의 텍스트 박스(Text-cutout) 지원.
+- **인쇄 최적화**: 구글 스프레드시트 자료를 A4 레이아웃에 맞춰 자동 배치하여 출력.
+
+---
+
+## 📂 프로젝트 구조
 
 ```
-teaching-materials/
-├── index.html                  # 셸 (레이아웃)
-├── style.css                   # 디자인 시스템
-├── app.js                      # 렌더링 + 인터랙션
+rat-discri/
+├── index.html          # 앱 메인 셸 및 대시보드
+├── print.html          # 인쇄용 전용 페이지
+├── css/                # 모듈화된 스타일시트
+│   ├── base.css        # 디자인 토큰 및 리셋
+│   ├── layout.css      # 메인 구조 및 사이드바
+│   ├── components.css  # 공통 UI 컴포넌트
+│   ├── features.css    # 특수 기능(포커스, 댓글 등)
+│   └── dashboard.css   # 대시보드 전용 스타일
+├── js/
+│   ├── app.js          # 메인 앱 로직 및 대시보드 제어
+│   └── print.js        # 인쇄 페이지 렌더링 로직
 ├── lessons/
-│   ├── rat-disc-1.json         # 합리적 차별 금지 1차시
-│   └── rat-disc-2.json         # 합리적 차별 금지 2차시
-├── assets/
-│   └── images/
-│       └── rational-discrimination/
-└── README.md
+│   ├── block-guide.json # 모든 블록 타입 가이드 (추천)
+│   ├── rat-disc-1.json  # 수업 데이터 예시
+│   └── ...
+└── assets/             # 이미지 및 미디어 에셋
 ```
 
-**한 파일 = 한 차시**. 같은 주제의 차시들은 `lessonGroup` 필드로 묶이고, `prev`/`next`로 연결됩니다.
+---
 
-## 로컬 실행
+## 🚀 시작하기
 
+### 로컬 실행
 ```bash
-python3 -m http.server 8000
+# 별도의 빌드 과정 없이 정적 서버로 바로 실행 가능합니다.
+python -m http.server 8000
 ```
+브라우저에서 `http://localhost:8000` 접속 시 세련된 **대시보드**가 나타납니다.
 
-브라우저에서 `http://localhost:8000` 접속 (기본 `rat-disc-1` 로드).
+### URL 파라미터
+- **대시보드**: `index.html` (파라미터 없음)
+- **특정 수업 진입**: `?lesson=파일명` (예: `?lesson=rat-disc-1`)
+- **섹션 바로가기**: `?lesson=파일명#섹션ID` (예: `#1-2`)
+- **인쇄 페이지**: `print.html?lesson=파일명`
 
-## GitHub Pages 배포
+---
 
-1. 이 폴더를 GitHub 저장소로 push (파일들이 저장소 루트에 있어야 함)
-2. 저장소 Settings → Pages → Source: `main` 브랜치 `/ (root)`
-3. 몇 분 뒤 `https://[계정명].github.io/[저장소명]/`로 접속
+## 🛠️ 블록 타입 및 기능
 
-## URL 파라미터
+상세한 블록 예시는 **[블록 가이드 갤러리](?lesson=block-guide)**에서 직접 확인할 수 있습니다.
 
-- `?lesson=rat-disc-1` — 1차시 (기본)
-- `?lesson=rat-disc-2` — 2차시
-- `#1-3` — 특정 섹션으로 바로 점프
+### 주요 블록
+- `paragraph`, `heading`: 기본 텍스트 및 소제목
+- `case`, `question`: 🟩사례 및 🗨️질문 박스 (실시간 댓글 지원)
+- `concept`: 💡핵심 개념 정리 박스
+- `figure-concept`, `figure-quote`: 인물 사진 기반 레이아웃
+- `quiz-accordion`: 기출문제 및 해설 접이식 목록
 
-예: `https://yadoran-2025.github.io/rat-disc/?lesson=rat-disc-2#2-1`
+### 특수 입력 포맷
+이미지 키 위치에 아래 형식을 사용하면 더 풍부한 화면을 구성할 수 있습니다.
+- **텍스트 컷아웃**: `text:##제목\n내용\n---\n출처` 형식으로 입력 시 신문 기사 스타일 렌더링.
+- **유튜브**: 유튜브 URL 입력 시 자동으로 썸네일 생성 및 재생 링크 연결.
+- **구글 드라이브**: 공유 링크 입력 시 자동으로 이미지 URL로 변환하여 로드.
 
-## 조작법
+---
 
-- `←` `→` 또는 `PageUp` `PageDown`: 섹션 이동
-- `Space` 또는 `Enter`: 현재 화면의 답 토글
-- 답 박스 클릭: 해당 답만 토글
-- 좌측 목차 클릭: 해당 섹션으로 점프
-- 사이드바 하단 "다음 차시 →": 다음 차시로 이동
+## ⌨️ 조작법
+- `←` `→` / `PageUp` `PageDown`: 섹션 이동
+- `Space` / `Enter`: 현재 화면의 첫 번째 답안 토글
+- `Esc`: 확대(Focus) 모드 또는 라이트박스 닫기
+- `📺 버튼 (Hover)`: 특정 블록만 화면에 꽉 차게 확대하여 집중
 
-## 이미지 배치
+---
 
-파일명은 `assets/images/rational-discrimination/` 아래에:
+## 📝 수업 자료 추가 가이드
+1. `lessons/` 폴더에 새로운 `.json` 파일을 생성합니다.
+2. `js/app.js`의 `showDashboard()` 함수 내 `lessons` 배열에 새 수업 정보를 추가하면 대시보드에 자동으로 노출됩니다.
+3. 구글 스프레드시트와 연동하여 에셋(이미지, 텍스트)을 관리하려면 `app.js`의 `SHEET_URLS`를 수정하세요.
 
-**1차시**
-| 파일명 | 용도 |
-|---|---|
-| `1-1-math-a.jpg` / `1-1-math-b.jpg` | 수학문제 Q |
-| `1-1-vocal-a.webp` / `1-1-vocal-b.jpg` | 보컬 Q |
-| `1-1-appearance-a.png` / `1-1-appearance-b.png` | 지적 능력 Q |
-| `1-1-allport.jpg` | 올포트 초상 |
-| `1-3-dworkin.jpg` | 드워킨 초상 (1-3, 1-4 재사용) |
-| `1-4-constitution.png` | 헌법 차별금지영역 |
-| `1-4-nhrc-law.png` | 국가인권위원회법 |
-
-**2차시**
-| 파일명 | 용도 |
-|---|---|
-| `2-1-objection.png` | 학생 반문 이미지 |
-| `2-2-minority-a.jpg` / `b.jpg` / `c.jpg` | 사회적 소수자 관련 |
-
-이미지가 없으면 "이미지: 파일명" 플레이스홀더가 표시됩니다.
-
-## 새 수업 추가하기
-
-**같은 주제의 다른 차시**: `lessons/rat-disc-3.json` 같은 파일 만들고 `prev`/`next` 체인에 연결.
-
-**새 주제의 수업**: `lessons/new-topic.json` 만들고 이미지 폴더도 별도 추가. URL은 `?lesson=new-topic`.
-
-JSON 최상위 필드:
+JSON 최상위 필드 예시:
 
 ```json
 {
@@ -93,9 +98,6 @@ JSON 최상위 필드:
   "next": "다음_차시_id 또는 null",
   "sections": [...]
 }
-```
-
-## 블록 타입
 
 - `paragraph` — 일반 단락
 - `heading` — 섹션 내부 소제목

@@ -28,9 +28,11 @@
   --brand-ink: #0A2E7A;
   /* 파랑 계열 텍스트 */
 
-  /* 강조 — 빨강 (키워드 하이라이트) */
-  --accent: #E53935;
-  --accent-deep: #C62828;
+  /* 강조 — 파랑 (키워드 하이라이트) */
+  --accent: #1B6BFF;
+  --accent-rgb: 27, 107, 255;
+  --accent-deep: #0F4FCC;
+  --accent-light: #E6EEFF;
 
   /* 콜아웃: 사례 (초록, 쿨/모던 톤) */
   --case-bg: #EAF5EE;
