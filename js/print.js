@@ -25,9 +25,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const imagesToPrint = keys.map(function(key) {
             const cleanKey = String(key).trim();
-            const rawUrl = sheetMap[cleanKey] || '';
-            return { key: cleanKey, url: transformDriveUrl(rawUrl) };
-        }).filter(function(img) { return img.url; });
+            const data = sheetMap[cleanKey];
+            if (!data) return null;
+            return { 
+                key: cleanKey, 
+                url: transformDriveUrl(data.url),
+                keywords: data.keywords 
+            };
+        }).filter(function(img) { return img && img.url; });
 
         if (imagesToPrint.length === 0) {
             rootContainer.innerHTML = '<div style="padding:40px; color:#999; text-align:center;">표시할 자료가 없습니다.<br>JSON의 imageKeys가 구글 시트와 일치하는지 확인하세요.</div>';
@@ -158,7 +163,21 @@ function createPrintCard(item) {
     
     const caption = document.createElement('div');
     caption.className = 'caption';
-    caption.textContent = item.key;
+    
+    const keyLabel = document.createElement('span');
+    keyLabel.className = 'caption-key';
+    keyLabel.textContent = item.key;
+    caption.appendChild(keyLabel);
+
+    if (item.keywords && item.keywords.length > 0) {
+        item.keywords.forEach(function(kw) {
+            const tag = document.createElement('span');
+            tag.className = 'tag-badge';
+            tag.textContent = kw;
+            caption.appendChild(tag);
+        });
+    }
+    
     card.appendChild(caption);
 
     if (item.isText) {
@@ -243,9 +262,14 @@ function parseSheetCSV(csvText) {
             else curr += char;
         }
         cells.push(curr.trim());
-        const key = cells[1] ? cells[1].replace(/^"|"$/g, '') : '';
-        const url = cells[3] ? cells[3].replace(/^"|"$/g, '') : '';
-        if (key && url) map[key] = url; //startsWith('http') 체크 제거 (text: 지원)
+        const key = cells[0] ? cells[0].replace(/^"|"$/g, '') : '';
+        const url = cells[1] ? cells[1].replace(/^"|"$/g, '') : '';
+        const keywordsRaw = cells[2] ? cells[2].replace(/^"|"$/g, '') : '';
+        const keywords = keywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        if (key && url) {
+            map[key] = { url: url, keywords: keywords };
+        }
     });
     return map;
 }

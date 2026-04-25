@@ -269,7 +269,7 @@
   margin: 1rem 0;
   height: 260px;
   justify-content: center;
-  align-items: stretch;
+  align-items: center;
   /* 부모 넘침 방지 */
   max-width: 100%;
   min-width: 0;
@@ -311,7 +311,8 @@
 }
 
 .image-pair img {
-  height: 100%;
+  max-height: 100%;
+  height: auto;
   width: auto;
   display: block;
   border-radius: var(--radius);

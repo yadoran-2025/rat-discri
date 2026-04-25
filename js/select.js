@@ -2,6 +2,7 @@ const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQYkmQF4OJAcQ
 
 let allKeys = [];
 const selected = new Set();
+const keyDataMap = {}; // 키별 메타데이터 저장용
 
 document.addEventListener('DOMContentLoaded', async () => {
     const listEl = document.getElementById('key-list');
@@ -43,9 +44,15 @@ function parseSheetKeys(csvText) {
     lines.forEach((line, idx) => {
         if (idx === 0 || !line.trim()) return;
         const cells = parseCsvLine(line);
-        const key = cells[1] ? cells[1].replace(/^"|"$/g, '').trim() : '';
-        const url = cells[3] ? cells[3].replace(/^"|"$/g, '').trim() : '';
-        if (key && url) keys.push(key);
+        const key = cells[0] ? cells[0].replace(/^"|"$/g, '').trim() : '';
+        const url = cells[1] ? cells[1].replace(/^"|"$/g, '').trim() : '';
+        const kwRaw = cells[2] ? cells[2].replace(/^"|"$/g, '').trim() : '';
+        const keywords = kwRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        if (key && url) {
+            keys.push(key);
+            keyDataMap[key] = { keywords };
+        }
     });
     return keys;
 }
@@ -156,7 +163,16 @@ function renderList(keys) {
                 cb.checked = selected.has(key);
 
                 const info = document.createElement('span');
-                info.innerHTML = '<div class="sel-item__key">' + escHtml(key) + '</div>';
+                let keyHtml = '<div class="sel-item__key">' + escHtml(key);
+                
+                const data = keyDataMap[key];
+                if (data && data.keywords && data.keywords.length > 0) {
+                    data.keywords.forEach(kw => {
+                        keyHtml += '<span class="tag-badge">' + escHtml(kw) + '</span>';
+                    });
+                }
+                keyHtml += '</div>';
+                info.innerHTML = keyHtml;
 
                 cb.addEventListener('change', () => {
                     if (cb.checked) selected.add(key); else selected.delete(key);
