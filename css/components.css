@@ -19,6 +19,21 @@
   color: var(--text);
 }
 
+/* formatInline()이 생성하는 마크다운 불릿 리스트 */
+ul.md-list {
+  margin: 0.35rem 0 0.35rem 1.25rem;
+  padding: 0;
+  list-style: disc;
+}
+ul.md-list ul.md-list {
+  margin-top: 0.2rem;
+  list-style: circle;
+}
+ul.md-list li {
+  margin-bottom: 0.2rem;
+  line-height: 1.7;
+}
+
 /* ---------- 구분선 ---------- */
 .divider {
   border: none;

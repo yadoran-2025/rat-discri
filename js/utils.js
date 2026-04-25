@@ -38,14 +38,47 @@ export function extractYouTubeId(url) {
 }
 
 /**
- * 인라인 텍스트 포맷팅 (강조, 줄바꿈)
+ * 인라인 텍스트 포맷팅 (강조, 줄바꿈, 마크다운 불릿)
+ * - **굵게** → <strong>
+ * - \n → <br>
+ * - "- " 로 시작하는 줄 → <ul class="md-list"><li>
+ * - "  - " (스페이스 2칸) 로 시작하는 줄 → 중첩 <ul> (1단 깊이)
  */
 export function formatInline(text) {
   if (!text) return "";
-  let s = escapeHtml(text);
-  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  s = s.replace(/\n/g, "<br>");
-  return s;
+
+  const lines = text.split("\n");
+  const inline = s => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+  let out = "";
+  let inUl = false;
+  let topLiOpen = false;
+  let inSubUl = false;
+
+  const closeSubUl  = () => { if (inSubUl)   { out += "</ul>";  inSubUl   = false; } };
+  const closeTopLi  = () => { closeSubUl();    if (topLiOpen) { out += "</li>"; topLiOpen = false; } };
+  const closeOuterUl = () => { closeTopLi();   if (inUl)      { out += "</ul>"; inUl      = false; } };
+
+  for (const line of lines) {
+    const subMatch = line.match(/^ {2}- (.*)/);
+    const topMatch = !subMatch && line.match(/^- (.*)/);
+
+    if (topMatch) {
+      closeTopLi();
+      if (!inUl) { if (out) out += "<br>"; out += '<ul class="md-list">'; inUl = true; }
+      out += `<li>${inline(topMatch[1])}`;
+      topLiOpen = true;
+    } else if (subMatch) {
+      if (!inUl) { if (out) out += "<br>"; out += '<ul class="md-list">'; inUl = true; }
+      if (!inSubUl) { out += '<ul class="md-list">'; inSubUl = true; }
+      out += `<li>${inline(subMatch[1])}</li>`;
+    } else {
+      closeOuterUl();
+      out += (out ? "<br>" : "") + inline(line);
+    }
+  }
+  closeOuterUl();
+  return out;
 }
 
 /**

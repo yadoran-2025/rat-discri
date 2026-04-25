@@ -3,7 +3,8 @@ import { formatInline, escapeHtml, parseExamTitle, extractYouTubeId } from "../u
 import { attachFocusAffordance, openImageLightbox } from "./components.js";
 import { buildCommentSection } from "./comments.js";
 
-const FULLSCREEN_TYPES = new Set(['사례', '발문', '개념', '이미지곁글', '미디어', '기출문제', '접이식', '요약']);
+const FULLSCREEN_TYPES  = new Set(['사례', '발문', '개념', '이미지곁글', '미디어', '기출문제', '접이식', '요약']);
+const IMG_SELF_HANDLED  = new Set(['이미지곁글', '미디어']); // 자체적으로 이미지를 처리하는 블록
 
 /**
  * 블록 디스패처: 타입에 맞는 렌더러 호출
@@ -34,7 +35,22 @@ export function renderBlock(block, blockIdx) {
   const fn = map[block.type];
   if (!fn) { console.warn("Unknown block type:", block.type); return null; }
   const el = fn(block, blockIdx);
-  if (el && FULLSCREEN_TYPES.has(block.type)) attachFocusAffordance(el);
+  if (el) {
+    // [P0] 공통 이미지 필드: 이미지를 직접 처리하는 블록 타입 제외
+    if (!IMG_SELF_HANDLED.has(block.type)) {
+      if (block.image) {
+        const img = buildImage(block.image);
+        img.style.marginTop = "1rem";
+        el.appendChild(img);
+      }
+      if (block.images) block.images.forEach(src => {
+        const img = buildImage(src);
+        img.style.marginTop = "1rem";
+        el.appendChild(img);
+      });
+    }
+    if (FULLSCREEN_TYPES.has(block.type)) attachFocusAffordance(el);
+  }
   return el;
 }
 
@@ -60,24 +76,58 @@ export function renderDivider() {
   return hr;
 }
 
-/* ── 콜아웃 ── */
+/* ── 콜아웃 (사례·개념·news 통합 렌더러) ── */
+
+/**
+ * [P1] 통합 콜아웃 렌더러
+ * style: "case" | "concept" | "news"
+ * 필드: title(=label), body(=text), footer(=sub/source), bullets (concept 전용)
+ */
+function renderCallout(block, defaultStyle) {
+  const style = block.style ?? defaultStyle;
+
+  if (style === "news") {
+    const tc = buildTextCutout(block);
+    tc.classList.add("block");
+    return tc;
+  }
+
+  const title  = block.title  ?? block.label ?? null;
+  const body   = block.body   ?? block.text  ?? null;
+  const footer = block.footer ?? block.sub   ?? null;
+
+  const div = document.createElement("div");
+  div.className = `block callout ${style}`;
+
+  let html = "";
+  if (style === "concept") {
+    if (title)         html += `<div class="concept__title">💡 ${escapeHtml(title)}</div>`;
+    if (body)          html += `<div class="concept__body">${formatInline(body)}</div>`;
+    if (block.bullets) {
+      html += `<ul class="concept__bullets">`;
+      block.bullets.forEach(b => { html += `<li>${formatInline(b)}</li>`; });
+      html += `</ul>`;
+    }
+    if (footer)        html += `<div class="concept__body" style="margin-top:0.75rem;font-size:0.95rem;">${formatInline(footer)}</div>`;
+  } else {
+    if (title)  html += `<div class="callout__label">${escapeHtml(title)}</div>`;
+    if (body)   html += `<div class="case__text">${formatInline(body)}</div>`;
+    if (footer) html += `<div class="case__sub">${formatInline(footer)}</div>`;
+  }
+  div.innerHTML = html;
+
+  if (block.answer) div.appendChild(buildAnswer(block.answer));
+  return div;
+}
 
 function renderCase(block, blockIdx) {
-  const div = document.createElement("div");
-  div.className = "block callout case";
-  let html = "";
-  if (block.label) html += `<div class="callout__label">${escapeHtml(block.label)}</div>`;
-  html += `<div class="case__text">${formatInline(block.text)}</div>`;
-  if (block.sub) html += `<div class="case__sub">${formatInline(block.sub)}</div>`;
-  div.innerHTML = html;
-  if (block.answer) div.appendChild(buildAnswer(block.answer));
+  const div = renderCallout(block, "case");
 
   if (!block.comments) return div;
 
   const lessonId = app.lesson.id || app.lesson.title || "lesson";
   const sectionId = app.lesson.sections[app.currentIdx]?.id || `sec${app.currentIdx}`;
-  const bIdx = blockIdx ?? 0;
-  const commentKey = `${lessonId}__${sectionId}__b${bIdx}__p0`;
+  const commentKey = `${lessonId}__${sectionId}__b${blockIdx ?? 0}__p0`;
   const wrapper = document.createElement("div");
   wrapper.className = "case-with-comments";
   div.classList.remove("block");
@@ -141,23 +191,7 @@ function renderQuestion(block, blockIdx) {
 }
 
 function renderConcept(block) {
-  const div = document.createElement("div");
-  div.className = "block callout concept";
-  let html = "";
-  if (block.title) html += `<div class="concept__title">💡 ${escapeHtml(block.title)}</div>`;
-  if (block.body)  html += `<div class="concept__body">${formatInline(block.body)}</div>`;
-  if (block.bullets) {
-    html += `<ul class="concept__bullets">`;
-    block.bullets.forEach(b => { html += `<li>${formatInline(b)}</li>`; });
-    html += `</ul>`;
-  }
-  div.innerHTML = html;
-  if (block.image) {
-    const img = buildImage(block.image);
-    img.style.marginTop = "1rem";
-    div.appendChild(img);
-  }
-  return div;
+  return renderCallout(block, "concept");
 }
 
 /* ── 레이아웃 ── */
@@ -185,11 +219,12 @@ function renderFigure(block) {
   }
 
   const right = document.createElement("div");
-  if (block.title) {
+  const kind = block.kind ?? (block.title ? "concept" : "quote");
+  if (kind === "concept") {
     right.className = "callout concept";
     right.style.margin = "0";
     right.innerHTML = `
-      <div class="concept__title">💡 ${escapeHtml(block.title)}</div>
+      <div class="concept__title">💡 ${escapeHtml(block.title || "")}</div>
       <div class="concept__body">${formatInline(block.body || "")}</div>
     `;
   } else {
@@ -234,7 +269,7 @@ function renderMedia(block) {
     return div;
   }
 
-  if (block.kind === "text") {
+  if (block.kind === "text" || block.style === "news") {
     const tc = buildTextCutout(block);
     tc.classList.add("block");
     return tc;
@@ -413,20 +448,22 @@ function buildImage(key, alt = "") {
 function buildTextCutout(block) {
   const wrap = document.createElement("div");
   wrap.className = "text-cutout";
-  if (block.headline) {
+  const headline = block.headline ?? block.title ?? null;
+  if (headline) {
     const h = document.createElement("div");
     h.className = "text-cutout__headline";
-    h.innerHTML = formatInline(block.headline);
+    h.innerHTML = formatInline(headline);
     wrap.appendChild(h);
   }
   const bodyEl = document.createElement("div");
   bodyEl.className = "text-cutout__body";
   bodyEl.innerHTML = formatInline(block.body || "");
   wrap.appendChild(bodyEl);
-  if (block.source) {
+  const source = block.source ?? block.footer ?? null;
+  if (source) {
     const src = document.createElement("div");
     src.className = "text-cutout__source";
-    src.innerHTML = formatInline(block.source);
+    src.innerHTML = formatInline(source);
     wrap.appendChild(src);
   }
   return wrap;
