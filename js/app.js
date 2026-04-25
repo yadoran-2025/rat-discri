@@ -19,19 +19,18 @@ async function init() {
   }
 
   try {
-    const res = await fetch(`lessons/${lessonId}.json?_=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`${res.status}`);
-    app.lesson = await res.json();
+    const [lessonRes, indexRes] = await Promise.all([
+      fetch(`lessons/${lessonId}.json?_=${Date.now()}`, { cache: "no-store" }),
+      fetch(`lessons/index.json`).catch(() => null)
+    ]);
+    if (!lessonRes.ok) throw new Error(`${lessonRes.status}`);
+    app.lesson = await lessonRes.json();
 
-    // index.json에서 그룹 정보 가져와서 lessonGroup 동적 설정 (Source of Truth)
     try {
-      const indexRes = await fetch(`lessons/index.json?_=${Date.now()}`);
-      if (indexRes.ok) {
+      if (indexRes?.ok) {
         const indexData = await indexRes.json();
         const group = indexData.groups?.find(g => g.lessons.some(l => l.id === lessonId));
-        if (group) {
-          app.lesson.lessonGroup = group.title;
-        }
+        if (group) app.lesson.lessonGroup = group.title;
       }
     } catch (e) {
       console.warn("그룹 제목을 연동하지 못했습니다.");
