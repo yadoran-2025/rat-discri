@@ -10,7 +10,7 @@
         "대한민국공군 제18전투비행단(2023-2024)",
         "수원 잠원중학교(2025-)"
       ],
-      "bio": "삶은 언제나 미결 속을 헤메이고, 우리는 언제나 과정 속에 있다.",
+      "bio": "학생들을 가르치지만, 배우는 걸 더 좋아합니다.",
       "works": [
         {
           "type": "lesson",
@@ -39,9 +39,26 @@
       ]
     },
     {
+      "id": "Hyum",
+      "name": "김현석",
+      "avatar": "https://blog.kakaocdn.net/dna/liSM8/btsC4dHtAaN/AAAAAAAAAAAAAAAAAAAAAECIn5ZCk1IC5aKDvp6iW3Aw6isATYd7zXhMQmrfFfsV/img.png?credential=yqXZFxpELC7KVnFOS48ylbz2pIh7yKj8&expires=1777561199&allow_ip=&allow_referer=&signature=8ogIL%2FoePHkatzqRvAu%2FLVIf0hQ%3D",
+      "interests": "금융교육, 정치교육",
+      "career": [
+        "세종 한솔고등학교 (2023-2025)",
+        "공익근무 Agent (2026-)"
+      ],
+      "bio": "학생들과 함께, 교실에서 세상을 바라봅니다.",
+      "works": [
+        {
+          "type": "game",
+          "id": "political-civilization"
+        }
+      ]
+    },
+    {
       "id": "Do",
       "name": "이도빈",
-      "interests": "법교육",
+      "interests": "법교육, 북한 사투리, 비행기, 한화야구",
       "career": [
         "망포고등학교(2025)",
         "대한민국공군 작전사령부(2026-)"
@@ -61,12 +78,12 @@
     {
       "id": "Han",
       "name": "한인준",
-      "interests": "헌법교육",
+      "interests": "정치교육, 학교민주주의, 전투뜀걸음",
       "career": [
         "평택 현화고등학교(2025)",
         "대한민국공군 장교교육대(2026-)"
       ],
-      "bio": "깨어있는 시민의 조직된 힘.",
+      "bio": "社會 : 사람이 모이고 모이면 무슨 일이 일어나는가?",
       "works": [
         {
           "type": "lesson",

@@ -69,6 +69,20 @@
       "title": "생산분배소비 사구동성",
       "desc": "생산인가 분배인가, 아니면 소비인가, 조원 넷이 동시에 외치는 게임입니다.",
       "link": "https://yadoran-2025.github.io/ssb-4mouth/"
+    },
+    {
+      "id": "political-civilization",
+      "tag": "게임",
+      "title": "정치 문명",
+      "desc": "김현석이 만듦",
+      "link": ""
+    },
+    {
+      "id": "domestic-overseas",
+      "tag": "게임",
+      "title": "국내일까 해외일까",
+      "desc": "침착맨 채널에서 만든, 사진을 보고 국내일지 해외일지 추리하는 게임입니다.",
+      "link": "https://chimhaha.net/game/quiz"
     }
   ],
   "tools": [
