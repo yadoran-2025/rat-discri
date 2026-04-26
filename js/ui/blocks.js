@@ -104,7 +104,7 @@ function renderCallout(block, defaultStyle) {
 
   let html = "";
   if (style === "concept") {
-    if (title)         html += `<div class="concept__title">💡 ${escapeHtml(title)}</div>`;
+    if (title)         html += `<div class="concept__title">${escapeHtml(title)}</div>`;
     if (body)          html += `<div class="concept__body">${formatInline(body)}</div>`;
   } else {
     if (title)  html += `<div class="callout__label">${escapeHtml(title)}</div>`;
@@ -141,7 +141,7 @@ function renderQuestion(block, blockIdx) {
 
   const div = document.createElement("div");
   div.className = "block callout question";
-  div.innerHTML = `<div class="callout__label">🗨️ 생각해볼 문제</div>`;
+  div.innerHTML = `<div class="callout__label">생각해볼 문제</div>`;
 
   const commentSections = [];
 
@@ -161,8 +161,8 @@ function renderQuestion(block, blockIdx) {
       commentSections.push({
         key: commentKey,
         label: block.prompts.length > 1
-          ? `💬 Q${promptIdx + 1} 학생 답변 보기`
-          : "💬 학생 답변 보기",
+          ? `Q${promptIdx + 1} 학생 답변 보기`
+          : "학생 답변 보기",
       });
     }
   });
@@ -227,7 +227,7 @@ function renderFigure(block) {
     right.className = "callout concept";
     right.style.margin = "0";
     right.innerHTML = `
-      <div class="concept__title">💡 ${escapeHtml(block.title || "")}</div>
+      <div class="concept__title">${escapeHtml(block.title || "")}</div>
       <div class="concept__body">${formatInline(block.body || "")}</div>
     `;
   } else {
