@@ -11,15 +11,20 @@
   position: relative;
 }
 
-.dashboard__about-link {
+.dashboard__top-nav {
   position: absolute;
   top: 1rem;
   right: 1.25rem;
+  display: flex;
+  gap: 0.5rem;
   z-index: 2;
+}
+
+.dashboard__about-link,
+.dashboard__ds-link {
   border: 1px solid rgba(207, 214, 226, 0.9);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.8);
-  color: var(--accent-deep);
   padding: 0.34rem 0.75rem;
   font-size: 0.68rem;
   font-weight: 900;
@@ -27,13 +32,24 @@
   text-decoration: none;
   box-shadow: 0 4px 14px rgba(17, 20, 24, 0.05);
   backdrop-filter: blur(6px);
+  transition: all 0.2s;
 }
 
-.dashboard__about-link:hover {
+.dashboard__about-link {
+  color: var(--accent-deep);
+}
+
+.dashboard__ds-link {
+  color: var(--brand);
+}
+
+.dashboard__about-link:hover,
+.dashboard__ds-link:hover {
   border-color: rgba(var(--accent-rgb), 0.35);
   background: #ffffff;
   text-decoration: underline;
   text-underline-offset: 3px;
+  transform: translateY(-1px);
 }
 
 .dashboard__inner {

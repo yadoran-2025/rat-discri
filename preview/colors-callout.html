@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Pretendard', -apple-system, sans-serif; background: #fff; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .callout { border-radius: 12px; padding: 14px 18px; border-left: 4px solid; }
+  .callout__label { font-size: 12px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.01em; }
+  .callout__body { font-size: 13px; line-height: 1.6; }
+  .case  { background: #EAF5EE; border-left-color: #2E7D4F; color: #16402A; }
+  .question { background: #E6EEFF; border-left-color: #1B6BFF; color: #0A2E7A; }
+  .concept  { background: #F4F6FA; border-left-color: #5A6372; color: #111418; }
+  .swatches { display: flex; gap: 6px; margin-top: 6px; }
+  .dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); }
+  .dot-label { font-size: 9px; color: #9AA3B2; margin-top: 2px; text-align: center; }
+  .dot-group { display: flex; flex-direction: column; align-items: center; }
+</style>
+</head>
+<body>
+<div class="callout case">
+  <div class="callout__label">사례 — Case (Green)</div>
+  <div class="callout__body">초록 콜아웃: 학습 사례, 판례, 시나리오 등에 사용합니다.</div>
+  <div class="swatches">
+    <div class="dot-group"><div class="dot" style="background:#EAF5EE;"></div><div class="dot-label">BG</div></div>
+    <div class="dot-group"><div class="dot" style="background:#2E7D4F;"></div><div class="dot-label">Border</div></div>
+    <div class="dot-group"><div class="dot" style="background:#16402A;"></div><div class="dot-label">Text</div></div>
+  </div>
+</div>
+<div class="callout question">
+  <div class="callout__label">발문 — Question (Blue)</div>
+  <div class="callout__body">파랑 콜아웃: 학생에게 던지는 질문, 토론 발문에 사용합니다.</div>
+  <div class="swatches">
+    <div class="dot-group"><div class="dot" style="background:#E6EEFF;"></div><div class="dot-label">BG</div></div>
+    <div class="dot-group"><div class="dot" style="background:#1B6BFF;"></div><div class="dot-label">Border</div></div>
+    <div class="dot-group"><div class="dot" style="background:#0A2E7A;"></div><div class="dot-label">Text</div></div>
+  </div>
+</div>
+<div class="callout concept">
+  <div class="callout__label">개념 — Concept (Gray)</div>
+  <div class="callout__body">회색 콜아웃: 개념 정의, 용어 설명, 보충 자료에 사용합니다.</div>
+  <div class="swatches">
+    <div class="dot-group"><div class="dot" style="background:#F4F6FA; border-color:#E3E7EE;"></div><div class="dot-label">BG</div></div>
+    <div class="dot-group"><div class="dot" style="background:#5A6372;"></div><div class="dot-label">Border</div></div>
+    <div class="dot-group"><div class="dot" style="background:#111418;"></div><div class="dot-label">Text</div></div>
+  </div>
+</div>
+</body>
+</html>

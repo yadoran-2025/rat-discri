@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; padding: 20px 24px; font-family: 'Pretendard', -apple-system, sans-serif; display: flex; flex-direction: column; gap: 10px; }
+  .answer { border: 1px solid #E3E7EE; border-radius: 8px; overflow: hidden; background: #fff; }
+  .answer__toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 11px 14px; text-align: left; font-size: 13px; font-weight: 700; color: #1B6BFF; background: transparent; border: none; cursor: pointer; transition: background 0.15s; }
+  .answer__toggle:hover { background: #E6EEFF; color: #0F4FCC; }
+  .answer--open { background: #EAF2FF; border-color: #1B6BFF; }
+  .answer--open .answer__toggle { color: #0F4FCC; }
+  .answer__chevron { font-size: 10px; transition: transform 0.2s; }
+  .answer--open .answer__chevron { transform: rotate(180deg); }
+  .answer__content { padding: 10px 14px 14px; border-top: 1px solid rgba(27,107,255,0.2); font-size: 13px; line-height: 1.65; color: #111418; }
+  .label { font-size: 10px; color: #9AA3B2; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="label">Closed (default)</div>
+  <div class="answer">
+    <div class="answer__toggle">모범 답안 보기 <span class="answer__chevron">▼</span></div>
+  </div>
+
+  <div class="label">Open state</div>
+  <div class="answer answer--open">
+    <div class="answer__toggle">모범 답안 닫기 <span class="answer__chevron">▼</span></div>
+    <div class="answer__content">
+      장애는 직무 수행 능력과 직접적인 관련이 없는 신체적 특성으로, 이를 채용 거부의 기준으로 삼는 것은 합리적 이유가 없는 불합리한 차별에 해당합니다.
+    </div>
+  </div>
+</body>
+</html>

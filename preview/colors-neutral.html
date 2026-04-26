@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Pretendard', -apple-system, sans-serif; background: #fff; padding: 20px; }
+  .row { display: flex; gap: 10px; }
+  .swatch { flex: 1; border-radius: 8px; overflow: hidden; border: 1px solid #E3E7EE; }
+  .swatch__color { height: 72px; }
+  .swatch__info { padding: 8px 10px; background: #fff; }
+  .swatch__name { font-size: 11px; font-weight: 700; color: #111418; }
+  .swatch__hex  { font-size: 10px; color: #5A6372; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .swatch__role { font-size: 9px; color: #9AA3B2; margin-top: 1px; }
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="swatch">
+    <div class="swatch__color" style="background:#111418;"></div>
+    <div class="swatch__info">
+      <div class="swatch__name">Text</div>
+      <div class="swatch__hex">#111418</div>
+      <div class="swatch__role">Primary body text</div>
+    </div>
+  </div>
+  <div class="swatch">
+    <div class="swatch__color" style="background:#5A6372;"></div>
+    <div class="swatch__info">
+      <div class="swatch__name">Muted</div>
+      <div class="swatch__hex">#5A6372</div>
+      <div class="swatch__role">Secondary / meta</div>
+    </div>
+  </div>
+  <div class="swatch">
+    <div class="swatch__color" style="background:#9AA3B2;"></div>
+    <div class="swatch__info">
+      <div class="swatch__name">Faint</div>
+      <div class="swatch__hex">#9AA3B2</div>
+      <div class="swatch__role">Disabled / placeholder</div>
+    </div>
+  </div>
+  <div class="swatch">
+    <div class="swatch__color" style="background:#E3E7EE; border-bottom: 1px solid #ddd;"></div>
+    <div class="swatch__info">
+      <div class="swatch__name">Border</div>
+      <div class="swatch__hex">#E3E7EE</div>
+      <div class="swatch__role">Default border</div>
+    </div>
+  </div>
+  <div class="swatch">
+    <div class="swatch__color" style="background:#F4F6FA; border-bottom: 1px solid #E3E7EE;"></div>
+    <div class="swatch__info">
+      <div class="swatch__name">BG Soft</div>
+      <div class="swatch__hex">#F4F6FA</div>
+      <div class="swatch__role">Content area bg</div>
+    </div>
+  </div>
+  <div class="swatch">
+    <div class="swatch__color" style="background:#F7F9FC; border-bottom: 1px solid #E3E7EE;"></div>
+    <div class="swatch__info">
+      <div class="swatch__name">BG Sidebar</div>
+      <div class="swatch__hex">#F7F9FC</div>
+      <div class="swatch__role">Sidebar background</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

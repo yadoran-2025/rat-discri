@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; padding: 18px 20px; font-family: 'Pretendard', -apple-system, sans-serif; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .token { background: #F4F6FA; border-radius: 8px; padding: 10px 12px; display: flex; gap: 12px; align-items: center; }
+  .token__box { border-radius: 6px; flex-shrink: 0; }
+  .token__name { font-size: 11px; font-weight: 700; color: #111418; }
+  .token__val  { font-size: 10px; color: #9AA3B2; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .section-label { font-size: 9px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #9AA3B2; margin-bottom: 6px; margin-top: 10px; }
+  .section-label:first-child { margin-top: 0; }
+</style>
+</head>
+<body>
+  <div class="section-label">Spacing scale</div>
+  <div class="grid">
+    <div class="token"><div class="token__box" style="width:4px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-1</div><div class="token__val">0.25rem · 4px</div></div></div>
+    <div class="token"><div class="token__box" style="width:8px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-2</div><div class="token__val">0.5rem · 8px</div></div></div>
+    <div class="token"><div class="token__box" style="width:12px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-3</div><div class="token__val">0.75rem · 12px</div></div></div>
+    <div class="token"><div class="token__box" style="width:16px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-4</div><div class="token__val">1rem · 16px</div></div></div>
+    <div class="token"><div class="token__box" style="width:20px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-5</div><div class="token__val">1.25rem · 20px</div></div></div>
+    <div class="token"><div class="token__box" style="width:24px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-6</div><div class="token__val">1.5rem · 24px</div></div></div>
+    <div class="token"><div class="token__box" style="width:32px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-8</div><div class="token__val">2rem · 32px</div></div></div>
+    <div class="token"><div class="token__box" style="width:40px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-10</div><div class="token__val">2.5rem · 40px</div></div></div>
+    <div class="token"><div class="token__box" style="width:48px;height:24px;background:#1B6BFF;"></div><div><div class="token__name">space-12</div><div class="token__val">3rem · 48px</div></div></div>
+  </div>
+</body>
+</html>

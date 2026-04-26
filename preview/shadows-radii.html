@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #F4F6FA; padding: 20px; font-family: 'Pretendard', -apple-system, sans-serif; }
+  .grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+  .card { background: #fff; border-radius: var(--r,8px); padding: 14px 16px; border: 1px solid #E3E7EE; }
+  .card__name { font-size: 11px; font-weight: 700; color: #111418; }
+  .card__val  { font-size: 10px; color: #9AA3B2; margin-top: 2px; }
+  .shadow-demo { height: 36px; border-radius: var(--r,8px); background: #fff; border: 1px solid #E3E7EE; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div>
+    <div class="shadow-demo" style="box-shadow:0 1px 2px rgba(17,20,24,0.04);--r:8px;"></div>
+    <div style="margin-top:8px;">
+      <div style="font-size:11px;font-weight:700;color:#111418;">shadow-sm</div>
+      <div style="font-size:10px;color:#9AA3B2;margin-top:2px;">Cards at rest</div>
+    </div>
+  </div>
+  <div>
+    <div class="shadow-demo" style="box-shadow:0 4px 16px rgba(17,20,24,0.06);--r:8px;"></div>
+    <div style="margin-top:8px;">
+      <div style="font-size:11px;font-weight:700;color:#111418;">shadow-md</div>
+      <div style="font-size:10px;color:#9AA3B2;margin-top:2px;">Panels, modals</div>
+    </div>
+  </div>
+  <div>
+    <div class="shadow-demo" style="box-shadow:0 10px 24px rgba(17,20,24,0.08);--r:8px;"></div>
+    <div style="margin-top:8px;">
+      <div style="font-size:11px;font-weight:700;color:#111418;">shadow-hover</div>
+      <div style="font-size:10px;color:#9AA3B2;margin-top:2px;">Card on hover</div>
+    </div>
+  </div>
+
+  <div class="card" style="--r:4px;">
+    <div class="card__name">radius-sm · 4px</div>
+    <div class="card__val">kbd, chevron badges</div>
+  </div>
+  <div class="card" style="--r:8px;">
+    <div class="card__name">radius · 8px</div>
+    <div class="card__val">Buttons, inputs, small cards</div>
+  </div>
+  <div class="card" style="--r:12px;">
+    <div class="card__name">radius-lg · 12px</div>
+    <div class="card__val">Callouts, dashboard cards</div>
+  </div>
+
+  <div style="grid-column:1/-1;">
+    <div class="shadow-demo" style="box-shadow:0 0 0 3px rgba(27,107,255,0.12); border-color:#1B6BFF;"></div>
+    <div style="margin-top:8px;">
+      <div style="font-size:11px;font-weight:700;color:#111418;">focus-ring</div>
+      <div style="font-size:10px;color:#9AA3B2;margin-top:2px;">Input focus: 0 0 0 3px rgba(27,107,255,0.12)</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
