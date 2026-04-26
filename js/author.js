@@ -344,6 +344,10 @@ function bindRootEvents() {
       removeMaterialCaption(path, itemIdx);
       renderEditor();
       refreshOutputs();
+    } else if (action === "add-quote-material") {
+      addQuoteMaterial(path);
+      renderEditor();
+      refreshOutputs();
     } else if (action === "remove-common-image") {
       removeCommonImage(path, itemIdx);
       renderEditor();
@@ -1185,6 +1189,7 @@ function legacyMediaFields(block, basePath) {
 
 function materialListEditor(title, path, hint = "자료 DB 키, URL, 직접 텍스트를 순서대로 추가합니다.", layoutPath = null) {
   const items = getPath(path) || [];
+  const isFigureQuote = layoutPath && (getPath(layoutPath) || "stack") === "figure";
   return `
     <div class="array-card">
       <div class="array-card__head">
@@ -1194,6 +1199,7 @@ function materialListEditor(title, path, hint = "자료 DB 키, URL, 직접 텍�
         ${layoutPath ? layoutButtonGroup("표시 방식", layoutPath) : ""}
         <div class="material-add-row">
           <button class="btn btn--sm btn--primary" type="button" data-action="pick-assets" data-path="${path}">새 자료 추가</button>
+          ${isFigureQuote ? `<button class="btn btn--sm" type="button" data-action="add-quote-material" data-path="${path}">인용문 직접 입력</button>` : ""}
         </div>
         <div class="field__hint">${escapeHtml(hint)}</div>
         <div class="row-list material-editor-list">
@@ -2108,6 +2114,16 @@ function removeMaterialCaption(path, index) {
   const item = list[index];
   if (!item || typeof item !== "object" || item.kind === "text") return;
   list[index] = item.ref || "";
+}
+
+function addQuoteMaterial(path) {
+  let list = getPath(path);
+  if (!Array.isArray(list)) {
+    list = [];
+    setPath(path, list);
+  }
+  list.push({ kind: "text", title: "", body: "", source: "" });
+  state.focusPath = `${path}.${list.length - 1}.body`;
 }
 
 function startBlockSort(event, handle) {

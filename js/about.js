@@ -2,6 +2,12 @@ import { escapeHtml } from "./utils.js";
 
 const root = document.getElementById("about-root");
 
+const state = {
+  members: [],
+  workMap: new Map(),
+  selectedMemberId: "",
+};
+
 init();
 
 async function init() {
@@ -14,45 +20,98 @@ async function init() {
     ]);
     if (!indexRes.ok) throw new Error(`lessons/index.json ${indexRes.status}`);
     if (!membersRes.ok) throw new Error(`members.json ${membersRes.status}`);
+
     const config = await indexRes.json();
     const memberData = await membersRes.json();
-    renderAbout(config, memberData);
+    state.members = Array.isArray(memberData.members) ? memberData.members : [];
+    state.workMap = createWorkMap(config.groups || [], config.games || []);
+    state.selectedMemberId = getInitialSelectedMemberId(state.members);
+
+    renderAbout();
   } catch (err) {
     root.innerHTML = renderError(err);
   }
 }
 
-function renderAbout(config, memberData) {
-  const members = Array.isArray(memberData.members) ? memberData.members : [];
-  const workMap = createWorkMap(config.groups || [], config.games || []);
-
+function renderAbout() {
   root.innerHTML = `
     <main class="about">
       <div class="about__inner">
-        <header class="about__header">
-          <div class="about__nav">
+        <header class="about__hero">
+          <nav class="about__nav" aria-label="About us navigation">
             <a class="about__back" href="index.html">대시보드로 돌아가기</a>
             <a class="about__manage" href="connect.html">제작자 연결 편집</a>
-          </div>
+          </nav>
+
           <p class="about__eyebrow">About us</p>
-          <h1 class="about__title">만든 사람들</h1>
-          <p class="about__intro">사회교육공동체 BOOONG(朋)을 소개합니다.</p>
+          <h1 class="about__slogan">우리는 사회를 읽고,<br>함께 질문을 만든다</h1>
+          <p class="about__intro">사회교육공동체 BOOONG(朋)</p>
         </header>
 
-        ${members.length ? renderMembers(members, workMap) : renderEmpty()}
+        ${state.members.length ? renderMemberExplorer() : renderEmpty()}
       </div>
     </main>
   `;
 
-  focusHashMember();
+  bindMemberExplorer();
 }
 
-function renderMembers(members, workMap) {
+function renderMemberExplorer() {
+  const selectedMember = getSelectedMember();
+
   return `
-    <section class="member-list" aria-label="기여자 프로필">
-      ${members.map(member => renderMemberCard(member, resolveMemberWorks(member, workMap))).join("")}
+    <section class="member-explorer" aria-label="구성원 소개">
+      <div class="member-codes" role="tablist" aria-label="구성원 선택">
+        ${state.members.map(member => renderMemberCode(member)).join("")}
+      </div>
+      <div class="member-detail" role="tabpanel" aria-live="polite">
+        ${selectedMember ? renderMemberCard(selectedMember, resolveMemberWorks(selectedMember, state.workMap)) : renderEmpty()}
+      </div>
     </section>
   `;
+}
+
+function renderMemberCode(member) {
+  const id = String(member.id || "");
+  const isActive = isSameMember(id, state.selectedMemberId);
+  const label = getMemberCode(member);
+
+  return `
+    <button
+      class="member-code ${isActive ? "is-active" : ""}"
+      type="button"
+      role="tab"
+      aria-selected="${isActive ? "true" : "false"}"
+      data-member-id="${escapeAttr(id)}"
+    >${escapeHtml(label)}</button>
+  `;
+}
+
+function bindMemberExplorer() {
+  root.querySelectorAll("[data-member-id]").forEach(button => {
+    button.addEventListener("click", () => {
+      selectMember(button.dataset.memberId || "");
+    });
+  });
+}
+
+function selectMember(memberId) {
+  const nextMember = state.members.find(member => isSameMember(member.id, memberId));
+  if (!nextMember) return;
+
+  state.selectedMemberId = nextMember.id;
+  const detail = root.querySelector(".member-detail");
+  if (detail) {
+    detail.innerHTML = renderMemberCard(nextMember, resolveMemberWorks(nextMember, state.workMap));
+  }
+
+  root.querySelectorAll("[data-member-id]").forEach(button => {
+    const isActive = isSameMember(button.dataset.memberId, state.selectedMemberId);
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
+  history.replaceState(null, "", `#${encodeURIComponent(nextMember.id)}`);
 }
 
 function renderMemberCard(member, works) {
@@ -63,15 +122,15 @@ function renderMemberCard(member, works) {
 
   return `
     <article class="member-card" id="${escapeAttr(member.id || "")}" tabindex="-1">
-      ${renderAvatar(member, name)}
-      <div class="member-card__profile">
-        <div class="member-card__head">
-          <div>
-            <h2 class="member-card__name">${escapeHtml(name)}</h2>
-            ${interests ? `<p class="member-card__role">관심사: ${escapeHtml(interests)}</p>` : ""}
-          </div>
-        </div>
+      <div class="member-card__visual">
+        ${renderAvatar(member, name)}
+        <span class="member-card__code">${escapeHtml(getMemberCode(member))}</span>
+      </div>
 
+      <div class="member-card__profile">
+        <p class="member-card__label">Profile</p>
+        <h2 class="member-card__name">${escapeHtml(name)}</h2>
+        ${interests ? `<p class="member-card__role">${escapeHtml(interests)}</p>` : ""}
         ${bio ? `<p class="member-card__bio">${escapeHtml(bio)}</p>` : ""}
         ${career ? renderCareer(career) : ""}
       </div>
@@ -144,7 +203,7 @@ function resolveMemberWorks(member, workMap) {
       type: work.type,
       id: work.id,
       label: work.type === "game" ? "게임" : "자료",
-      title: work.id || "알 수 없는 자료",
+      title: work.id || "이름 없는 자료",
       groupTitle: "미등록 자료",
       href: "#",
       external: false,
@@ -170,17 +229,26 @@ function renderCareer(career) {
   `;
 }
 
-function stripHtml(value) {
-  return String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+function getInitialSelectedMemberId(members) {
+  const hashId = decodeURIComponent(location.hash.replace(/^#/, ""));
+  const hashMember = members.find(member => isSameMember(member.id, hashId));
+  return hashMember?.id || members[0]?.id || "";
 }
 
-function focusHashMember() {
-  const id = decodeURIComponent(location.hash.replace(/^#/, ""));
-  if (!id) return;
-  const target = document.getElementById(id);
-  if (!target) return;
-  target.focus({ preventScroll: true });
-  target.scrollIntoView({ block: "start", behavior: "smooth" });
+function getSelectedMember() {
+  return state.members.find(member => isSameMember(member.id, state.selectedMemberId)) || state.members[0] || null;
+}
+
+function getMemberCode(member) {
+  return String(member.id || member.name || "member").trim().toLowerCase();
+}
+
+function isSameMember(a, b) {
+  return String(a || "").toLowerCase() === String(b || "").toLowerCase();
+}
+
+function stripHtml(value) {
+  return String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function getInitials(name) {
@@ -216,7 +284,7 @@ function renderEmpty() {
   return `
     <section class="about__notice">
       <h2>등록된 프로필이 없습니다</h2>
-      <p><code>lessons/index.json</code>의 <code>members</code> 배열에 프로필을 추가하면 이곳에 표시됩니다.</p>
+      <p><code>members.json</code>의 <code>members</code> 배열에 프로필을 추가하면 이곳에 표시됩니다.</p>
     </section>
   `;
 }

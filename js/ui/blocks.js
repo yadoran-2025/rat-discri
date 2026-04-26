@@ -334,9 +334,56 @@ function appendMaterials(parent, materials, layout = "stack") {
 function buildMaterials(materials, layout = "stack", extraClass = "") {
   const items = asArray(materials).map(material => resolveMaterial(material)).filter(Boolean);
   const wrap = document.createElement("div");
-  wrap.className = `block materials materials--${normalizeLayout(layout)} ${extraClass}`.trim();
-  items.forEach(material => wrap.appendChild(buildMaterial(material)));
+  const normalizedLayout = normalizeLayout(layout);
+  const shouldBalanceRow = normalizedLayout === "row" && items.length >= 2 && items.every(isVisualMaterial);
+  const balancedRowClass = shouldBalanceRow
+    ? "materials--balanced-row"
+    : "";
+  wrap.className = `block materials materials--${normalizedLayout} ${balancedRowClass} ${extraClass}`.trim();
+  items.forEach(material => {
+    const el = buildMaterial(material);
+    if (shouldBalanceRow) prepareBalancedMaterial(el, material, wrap);
+    wrap.appendChild(el);
+  });
+  if (shouldBalanceRow) updateBalancedMaterialColumns(wrap);
   return wrap;
+}
+
+function isVisualMaterial(material) {
+  return material.kind === "image" || material.kind === "video";
+}
+
+function prepareBalancedMaterial(el, material, wrap) {
+  const defaultAspect = material.kind === "video" ? 16 / 9 : 4 / 3;
+  setMaterialAspect(el, defaultAspect, wrap);
+
+  if (material.kind !== "image") return;
+
+  const img = el.querySelector("img");
+  if (!img) return;
+
+  const updateFromImage = () => {
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      setMaterialAspect(el, img.naturalWidth / img.naturalHeight, wrap);
+    }
+  };
+
+  if (img.complete) updateFromImage();
+  img.addEventListener("load", updateFromImage, { once: true });
+  img.addEventListener("error", () => setMaterialAspect(el, defaultAspect, wrap), { once: true });
+}
+
+function setMaterialAspect(el, aspect, wrap) {
+  el.style.setProperty("--material-aspect", String(aspect));
+  updateBalancedMaterialColumns(wrap);
+}
+
+function updateBalancedMaterialColumns(wrap) {
+  const columns = [...wrap.children].map(child => {
+    const aspect = Number.parseFloat(child.style.getPropertyValue("--material-aspect"));
+    return `${Number.isFinite(aspect) && aspect > 0 ? aspect : 1}fr`;
+  });
+  if (columns.length) wrap.style.gridTemplateColumns = columns.join(" ");
 }
 
 function buildMaterial(material) {
