@@ -113,7 +113,7 @@
 
 .member-card {
   display: grid;
-  grid-template-columns: 7rem minmax(0, 1fr) minmax(16rem, 0.45fr);
+  grid-template-columns: 7rem minmax(0, 1fr) minmax(17rem, 0.42fr);
   gap: 1.35rem;
   align-items: start;
   min-width: 0;
@@ -172,7 +172,7 @@
 }
 
 .member-card__career {
-  margin: 0.9rem 0 0;
+  margin: 1.05rem 0 0;
 }
 
 .member-card__career h3 {
@@ -207,7 +207,7 @@
 }
 
 .member-card__bio {
-  margin: 0.7rem 0 0;
+  margin: 0.9rem 0 0;
   color: var(--text-muted);
   font-size: 0.95rem;
   line-height: 1.65;
@@ -328,6 +328,7 @@
     border-left: 0;
     border-top: 1px solid var(--border);
   }
+
 }
 
 @media (max-width: 760px) {
@@ -353,4 +354,5 @@
     width: 5rem;
     height: 5rem;
   }
+
 }

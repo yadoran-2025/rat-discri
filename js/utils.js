@@ -31,10 +31,44 @@ export function extractYouTubeId(url) {
     const u = new URL(url);
     if (u.searchParams.has("v")) return u.searchParams.get("v");
     if (u.hostname === "youtu.be") return u.pathname.slice(1);
-    const m = u.pathname.match(/^\/embed\/([^/?]+)/);
+    const m = u.pathname.match(/^\/(?:embed|shorts)\/([^/?]+)/);
     if (m) return m[1];
   } catch (_) { }
   return null;
+}
+
+export function isHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+export function isImageLikeUrl(value) {
+  const text = String(value || "").trim();
+  if (text.includes("drive.google.com")) return true;
+  return /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?|#|$)/i.test(text);
+}
+
+export function stripTextMarker(value) {
+  let text = String(value ?? "").trim();
+  if (/^text:/i.test(text)) text = text.replace(/^text:/i, "").trimStart();
+  if (/^["“]/.test(text)) {
+    text = text.slice(1);
+    if (/["”]$/.test(text.trim())) text = text.trim().slice(0, -1);
+  }
+  return text;
+}
+
+export function inferMaterialKind(value, explicitKind = "") {
+  const kind = String(explicitKind || "").trim().toLowerCase();
+  if (kind === "link") return "image";
+  if (["image", "video", "text"].includes(kind)) return kind;
+
+  const text = String(value ?? "").trim();
+  if (!text) return "text";
+  if (/^text:/i.test(text) || /^["“]/.test(text)) return "text";
+  if (extractYouTubeId(text)) return "video";
+  if (isImageLikeUrl(text)) return "image";
+  if (isHttpUrl(text)) return "image";
+  return "text";
 }
 
 /**
@@ -60,10 +94,14 @@ export function formatInline(text) {
   const closeOuterUl = () => { closeTopLi();   if (inUl)      { out += "</ul>"; inUl      = false; } };
 
   for (const line of lines) {
+    const accentMatch = line.match(/^###(?!#)\s?(.*)/);
     const subMatch = line.match(/^ {2}- (.*)/);
     const topMatch = !subMatch && line.match(/^- (.*)/);
 
-    if (topMatch) {
+    if (accentMatch) {
+      closeOuterUl();
+      out += (out ? "<br>" : "") + `<span class="md-accent-line">${inline(accentMatch[1])}</span>`;
+    } else if (topMatch) {
       closeTopLi();
       if (!inUl) { if (out) out += "<br>"; out += '<ul class="md-list">'; inUl = true; }
       out += `<li>${inline(topMatch[1])}`;

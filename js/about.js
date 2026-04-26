@@ -72,8 +72,8 @@ function renderMemberCard(member, works) {
           </div>
         </div>
 
-        ${career ? renderCareer(career) : ""}
         ${bio ? `<p class="member-card__bio">${escapeHtml(bio)}</p>` : ""}
+        ${career ? renderCareer(career) : ""}
       </div>
 
       <aside class="member-lessons" aria-label="${escapeAttr(name)} 제작 자료">

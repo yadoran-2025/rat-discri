@@ -1,35 +1,39 @@
 import { app } from "../state.js";
-import { formatInline, escapeHtml, parseExamTitle, extractYouTubeId } from "../utils.js";
+import {
+  formatInline,
+  escapeHtml,
+  parseExamTitle,
+  extractYouTubeId,
+  inferMaterialKind,
+  stripTextMarker,
+  parseTextCutoutContent,
+} from "../utils.js";
 import { attachFocusAffordance, openImageLightbox } from "./components.js";
 
-const FULLSCREEN_TYPES  = new Set(['사례', '발문', '개념', '이미지곁글', '미디어', '기출문제', '접이식', '요약']);
+const FULLSCREEN_TYPES  = new Set(['사례', '발문', '개념', '이미지곁글', '미디어', '기출문제']);
 const IMG_SELF_HANDLED  = new Set(['이미지곁글', '미디어']); // 자체적으로 이미지를 처리하는 블록
 
 /**
  * 블록 디스패처: 타입에 맞는 렌더러 호출
  *
- * 블록 타입 목록 (11종):
- *   단락, 소제목, 구분선    — 기본 텍스트
+ * 블록 타입 목록:
+ *   소제목, 단락            — 기본 텍스트
  *   사례, 발문, 개념        — 콜아웃
  *   이미지곁글              — 이미지 + 텍스트 좌우 배치
  *   미디어                  — 이미지·영상·텍스트박스
  *   기출문제                — 수능 문제 아코디언
- *   접이식                  — 접이식 블록
- *   요약                    — 번호 목록 마무리
  */
 export function renderBlock(block, blockIdx) {
   const map = {
     단락:      renderParagraph,
     소제목:    renderHeading,
-    구분선:    renderDivider,
+    구분선:    () => null,
     사례:      renderCase,
     발문:      renderQuestion,
     개념:      renderConcept,
     이미지곁글: renderFigure,
     미디어:    renderMedia,
     기출문제:  renderQuizAccordion,
-    접이식:    renderExpandable,
-    요약:      renderSummary,
   };
   const fn = map[block.type];
   if (!fn) { console.warn("Unknown block type:", block.type); return null; }
@@ -80,7 +84,7 @@ export function renderDivider() {
 /**
  * [P1] 통합 콜아웃 렌더러
  * style: "case" | "concept" | "news"
- * 필드: title(=label), body(=text), footer(=sub/source), bullets (concept 전용)
+ * 필드: title(=label), body(=text), footer(=sub/source)
  */
 function renderCallout(block, defaultStyle) {
   const style = block.style ?? defaultStyle;
@@ -93,7 +97,7 @@ function renderCallout(block, defaultStyle) {
 
   const title  = block.title  ?? block.label ?? null;
   const body   = block.body   ?? block.text  ?? null;
-  const footer = block.footer ?? block.sub   ?? null;
+  const footer = style === "concept" ? null : block.footer ?? block.sub ?? null;
 
   const div = document.createElement("div");
   div.className = `block callout ${style}`;
@@ -102,12 +106,6 @@ function renderCallout(block, defaultStyle) {
   if (style === "concept") {
     if (title)         html += `<div class="concept__title">💡 ${escapeHtml(title)}</div>`;
     if (body)          html += `<div class="concept__body">${formatInline(body)}</div>`;
-    if (block.bullets) {
-      html += `<ul class="concept__bullets">`;
-      block.bullets.forEach(b => { html += `<li>${formatInline(b)}</li>`; });
-      html += `</ul>`;
-    }
-    if (footer)        html += `<div class="concept__body" style="margin-top:0.75rem;font-size:0.95rem;">${formatInline(footer)}</div>`;
   } else {
     if (title)  html += `<div class="callout__label">${escapeHtml(title)}</div>`;
     if (body)   html += `<div class="case__text">${formatInline(body)}</div>`;
@@ -115,6 +113,7 @@ function renderCallout(block, defaultStyle) {
   }
   div.innerHTML = html;
 
+  appendMaterials(div, block.materials, block.materialsLayout);
   if (block.answer) div.appendChild(buildAnswer(block.answer));
   return div;
 }
@@ -152,6 +151,7 @@ function renderQuestion(block, blockIdx) {
     p.innerHTML = `Q. ${formatInline(pr.q)}`;
     if (pr.note) p.innerHTML += `<div class="question__note">${formatInline(pr.note)}</div>`;
     div.appendChild(p);
+    appendMaterials(div, pr.materials, pr.materialsLayout);
 
     // answer는 항상 { text } 또는 { bullets } 객체
     if (pr.answer) div.appendChild(buildAnswer(pr.answer, "답 보기"));
@@ -168,12 +168,6 @@ function renderQuestion(block, blockIdx) {
   });
 
   if (block.imagePair) div.appendChild(buildImagePair(block.imagePair));
-  if (block.conclusion) {
-    const concl = document.createElement("div");
-    concl.className = "question__conclusion";
-    concl.innerHTML = formatInline(block.conclusion);
-    div.appendChild(concl);
-  }
 
   if (!block.comments) return div;
 
@@ -266,6 +260,10 @@ function renderFigure(block) {
  *                 추가 필드: headline?, body, source?
  */
 function renderMedia(block) {
+  if (block.item || block.items || block.materials) {
+    return buildMaterials(block.items || block.materials || block.item, block.layout || block.kind || "stack");
+  }
+
   if (block.kind === "row") {
     const div = document.createElement("div");
     div.className = "block image-row";
@@ -328,6 +326,57 @@ function renderMedia(block) {
   return div;
 }
 
+function appendMaterials(parent, materials, layout = "stack") {
+  if (!materials || !asArray(materials).length) return;
+  parent.appendChild(buildMaterials(materials, layout, "materials--embedded"));
+}
+
+function buildMaterials(materials, layout = "stack", extraClass = "") {
+  const items = asArray(materials).map(material => resolveMaterial(material)).filter(Boolean);
+  const wrap = document.createElement("div");
+  wrap.className = `block materials materials--${normalizeLayout(layout)} ${extraClass}`.trim();
+  items.forEach(material => wrap.appendChild(buildMaterial(material)));
+  return wrap;
+}
+
+function buildMaterial(material) {
+  if (material.kind === "text") {
+    return buildTextCutout({
+      headline: material.headline ?? material.title,
+      body: material.body ?? material.content ?? material.text ?? stripTextMarker(material.url ?? material.value ?? ""),
+      source: material.source ?? material.footer ?? material.caption,
+    });
+  }
+
+  if (material.kind === "video") {
+    return buildVideoMaterial(material.url || material.src || material.value || material.key, material.caption || "");
+  }
+
+  const figure = document.createElement("figure");
+  figure.className = "material material--image";
+  figure.appendChild(buildImage(material.url || material.src || material.value || material.key, material.caption || material.title || ""));
+  if (material.caption) {
+    const cap = document.createElement("figcaption");
+    cap.className = "media__caption";
+    cap.textContent = material.caption;
+    figure.appendChild(cap);
+  }
+  return figure;
+}
+
+function buildVideoMaterial(url, caption = "") {
+  const div = document.createElement("div");
+  div.className = "material media media--video";
+  div.appendChild(buildVideoThumb(url, caption));
+  if (caption) {
+    const cap = document.createElement("div");
+    cap.className = "media__caption";
+    cap.textContent = caption;
+    div.appendChild(cap);
+  }
+  return div;
+}
+
 /* ── 인터랙션 ── */
 
 function renderQuizAccordion(block) {
@@ -352,34 +401,6 @@ function renderQuizAccordion(block) {
     container.appendChild(itemEl);
   });
   return container;
-}
-
-function renderExpandable(block) {
-  const div = document.createElement("div");
-  div.className = "block expandable";
-  const btn = document.createElement("button");
-  btn.className = "expandable__summary";
-  btn.textContent = block.summary;
-  const content = document.createElement("div");
-  content.className = "expandable__content";
-  block.children.forEach(child => {
-    const el = renderBlock(child);
-    if (el) content.appendChild(el);
-  });
-  btn.addEventListener("click", () => div.classList.toggle("is-open"));
-  div.appendChild(btn);
-  div.appendChild(content);
-  return div;
-}
-
-function renderSummary(block) {
-  const div = document.createElement("div");
-  div.className = "block summary";
-  let html = "<ol>";
-  block.items.forEach(item => { html += `<li>${formatInline(item)}</li>`; });
-  html += "</ol>";
-  div.innerHTML = html;
-  return div;
 }
 
 /* ── 내부 헬퍼 ── */
@@ -414,8 +435,11 @@ function buildImagePair(paths) {
 }
 
 function buildImage(key, alt = "") {
-  let resolved = key;
-  if (app.lesson.assets?.[key]) resolved = app.lesson.assets[key];
+  const material = resolveMaterial(key, alt, "image");
+  if (material.kind === "text") return buildMaterial(material);
+  if (material.kind === "video") return buildVideoThumb(material.url || material.src || material.value || key, alt || material.caption || material.title || "");
+
+  let resolved = material.url || material.src || material.value || key;
 
   if (typeof resolved === "string" && resolved.includes("drive.google.com")) {
     const m = resolved.match(/\/d\/([^/]+)/) || resolved.match(/id=([^&]+)/);
@@ -424,22 +448,7 @@ function buildImage(key, alt = "") {
 
   const videoId = extractYouTubeId(resolved);
   if (videoId) {
-    const wrap = document.createElement("div"); wrap.className = "media__thumb-wrap";
-    const link = document.createElement("a");
-    link.href = resolved; link.target = "_blank"; link.rel = "noopener noreferrer";
-    link.className = "media__thumb-link"; link.setAttribute("aria-label", alt || "YouTube 영상 보기");
-    const thumb = document.createElement("img");
-    thumb.src = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
-    thumb.alt = alt || "YouTube 썸네일"; thumb.loading = "lazy";
-    thumb.onerror = () => {
-      const ph = document.createElement("div");
-      ph.className = "image-placeholder"; ph.textContent = "썸네일 없음";
-      thumb.replaceWith(ph);
-    };
-    const play = document.createElement("div");
-    play.className = "media__play-icon"; play.setAttribute("aria-hidden", "true"); play.textContent = "▶";
-    link.appendChild(thumb); link.appendChild(play); wrap.appendChild(link);
-    return wrap;
+    return buildVideoThumb(resolved, alt);
   }
 
   const src = /^https?:\/\//.test(resolved) ? resolved : app.lesson.imageBase + resolved;
@@ -454,7 +463,39 @@ function buildImage(key, alt = "") {
   return img;
 }
 
+function buildVideoThumb(url, alt = "") {
+  const videoId = extractYouTubeId(url);
+  const wrap = document.createElement("div"); wrap.className = "media__thumb-wrap";
+  const link = document.createElement("a");
+  link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer";
+  link.className = "media__thumb-link"; link.setAttribute("aria-label", alt || "YouTube 영상 보기");
+  if (videoId) {
+    const thumb = document.createElement("img");
+    thumb.src = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+    thumb.alt = alt || "YouTube 썸네일"; thumb.loading = "lazy";
+    thumb.onerror = () => {
+      const ph = document.createElement("div");
+      ph.className = "image-placeholder"; ph.textContent = "썸네일 없음";
+      thumb.replaceWith(ph);
+    };
+    link.appendChild(thumb);
+  }
+  const play = document.createElement("div");
+  play.className = "media__play-icon"; play.setAttribute("aria-hidden", "true"); play.textContent = "▶";
+  link.appendChild(play); wrap.appendChild(link);
+  return wrap;
+}
+
 function buildTextCutout(block) {
+  if (!block.body && (block.content || block.text || block.value || block.url)) {
+    const parsed = parseTextCutoutContent(stripTextMarker(block.content || block.text || block.value || block.url));
+    block = {
+      ...block,
+      headline: block.headline ?? block.title ?? parsed.headline,
+      body: block.body || parsed.body,
+      source: block.source ?? block.footer ?? parsed.source,
+    };
+  }
   const wrap = document.createElement("div");
   wrap.className = "text-cutout";
   const headline = block.headline ?? block.title ?? null;
@@ -476,4 +517,67 @@ function buildTextCutout(block) {
     wrap.appendChild(src);
   }
   return wrap;
+}
+
+function resolveMaterial(ref, alt = "", defaultKind = "") {
+  if (ref && typeof ref === "object") {
+    if (ref.ref) {
+      const explicitCaption = ref.caption || "";
+      const base = resolveMaterial(ref.ref, "", ref.kind || defaultKind || "image") || {};
+      return {
+        ...base,
+        ...ref,
+        key: base?.key ?? ref.ref,
+        caption: explicitCaption,
+        url: ref.url ?? base?.url,
+        src: ref.src ?? base?.src,
+        value: ref.value ?? base?.value,
+        kind: inferMaterialKind(ref.url ?? ref.src ?? ref.content ?? ref.body ?? ref.text ?? ref.value ?? base?.url ?? base?.value ?? "", ref.kind || base?.kind),
+      };
+    }
+    const value = ref.url ?? ref.src ?? ref.content ?? ref.body ?? ref.text ?? ref.value ?? "";
+    return {
+      ...ref,
+      kind: inferMaterialKind(value, ref.kind),
+    };
+  }
+
+  const key = String(ref ?? "").trim();
+  if (!key) return null;
+  const asset = app.lesson.assets?.[key];
+  if (asset && typeof asset === "object") {
+    const value = asset.url ?? asset.src ?? asset.content ?? asset.body ?? asset.text ?? asset.value ?? "";
+    const kind = inferMaterialKind(value, asset.kind);
+    if (kind === "text") {
+      return {
+        key,
+        ...asset,
+        kind,
+      };
+    }
+    return {
+      key,
+      ...asset,
+      kind,
+      caption: alt,
+    };
+  }
+  const value = asset || key;
+  let kind = inferMaterialKind(value);
+  if (defaultKind && kind === "text" && !/^text:/i.test(value) && !/^["“]/.test(value)) kind = defaultKind;
+  if (kind === "text") {
+    const parsed = parseTextCutoutContent(stripTextMarker(value));
+    return { key, kind, headline: alt || parsed.headline, body: parsed.body, source: parsed.source };
+  }
+  return { key, kind, url: value, caption: alt };
+}
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [value];
+}
+
+function normalizeLayout(layout) {
+  if (layout === "row" || layout === "grid") return "row";
+  if (layout === "figure") return "figure";
+  return "stack";
 }

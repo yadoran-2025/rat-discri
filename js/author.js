@@ -1,11 +1,19 @@
 import { app } from "./state.js";
-import { ASSET_SHEET_URLS, parseCSV } from "./api.js";
+import { ASSET_SHEET_URLS, parseCSV, normalizeAssetColumns } from "./api.js";
 import { renderBlock, renderDivider } from "./ui/blocks.js";
 import { escapeHtml } from "./utils.js";
 
-const BLOCK_TYPES = ["단락", "소제목", "구분선", "사례", "발문", "개념", "이미지곁글", "미디어", "기출문제", "접이식", "요약"];
-const LOCAL_CACHE_KEY = "lessonAuthorDraft_v1";
-const EXTERNAL_ASSETS_CACHE_KEY = "externalAssets_v1";
+const BLOCK_TYPE_GROUPS = [
+  ["기본", ["소제목", "단락"]],
+  ["활동", ["사례", "발문", "개념"]],
+  ["자료·문제", ["미디어", "기출문제"]],
+];
+const BLOCK_TYPES = BLOCK_TYPE_GROUPS.flatMap(([, types]) => types);
+const LEGACY_BLOCK_TYPES = ["이미지곁글"];
+const LOCAL_CACHE_KEY = "lessonAuthorDraft_v2";
+const EXTERNAL_ASSETS_CACHE_KEY = "externalAssets_v2";
+const LAYOUT_OPTIONS = [["stack", "아래로 나열"], ["row", "옆으로 나열"], ["figure", "사진+인용"]];
+const TEXT_FORMAT_HINT = "`### 강조문`을 쓰면 파란 강조 글씨로, `**강조**`는 굵은 강조로 표시됩니다.";
 // Paste the deployed Google Apps Script Web App /exec URL here.
 const ASSET_UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycbw_DJp0xMarEDwnQnpO0nEcQMhWygsMiBf_HGgnauh_ViU-KLmI1pG8ZI_CdNMNOi8P/exec";
 
@@ -27,11 +35,14 @@ const state = {
     file: null,
     dataUrl: "",
     key: "",
+    lastKey: "",
+    lastUrl: "",
     status: "",
     busy: false,
   },
   blockSort: null,
   openDetails: new Map(),
+  focusPath: "",
 };
 
 const uiIds = new WeakMap();
@@ -118,7 +129,7 @@ function renderShell() {
 
       <section class="panel asset-search" id="asset-search">
         <div class="panel__head">
-          <h2 class="panel__title">외부자료 추가</h2>
+          <h2 class="panel__title">외부 자료 목록</h2>
           <button class="btn btn--sm" type="button" data-action="close-assets">닫기</button>
         </div>
         <div class="asset-search__body">
@@ -143,6 +154,7 @@ function bindRootEvents() {
     }
     if (target.matches("[data-path]") && !target.dataset.path.endsWith(".__commonImageInput")) {
       writeField(target);
+      if (target.matches("textarea")) resizeTextarea(target);
       refreshOutputs();
     }
     if (target.id === "asset-query") renderAssetResults();
@@ -299,7 +311,16 @@ function bindRootEvents() {
       renderEditor();
       refreshOutputs();
     } else if (action === "array-add") {
-      const arr = getPath(path);
+      if (button.dataset.kind === "quiz") {
+        state.assetTarget = path;
+        openAssetSearch("quiz-items", "exam");
+        return;
+      }
+      let arr = getPath(path);
+      if (!Array.isArray(arr)) {
+        arr = [];
+        setPath(path, arr);
+      }
       arr.push(createArrayItem(button.dataset.kind));
       renderEditor();
       refreshOutputs();
@@ -309,6 +330,18 @@ function bindRootEvents() {
       refreshOutputs();
     } else if (action === "array-move") {
       moveItem(getPath(path), itemIdx, Number(button.dataset.dir));
+      renderEditor();
+      refreshOutputs();
+    } else if (action === "set-layout") {
+      setPath(path, button.dataset.value || "stack");
+      renderEditor();
+      refreshOutputs();
+    } else if (action === "add-material-caption") {
+      addMaterialCaption(path, itemIdx);
+      renderEditor();
+      refreshOutputs();
+    } else if (action === "remove-material-caption") {
+      removeMaterialCaption(path, itemIdx);
       renderEditor();
       refreshOutputs();
     } else if (action === "remove-common-image") {
@@ -361,6 +394,10 @@ function bindRootEvents() {
       applyAssetSelection();
     } else if (action === "upload-asset") {
       uploadClipboardAsset();
+    } else if (action === "copy-upload-url") {
+      copyUploadedAssetUrl();
+    } else if (action === "insert-upload-url") {
+      insertUploadedAssetUrl();
     } else if (action === "clear-upload-asset") {
       clearUploadAsset();
       renderUploadPanel();
@@ -373,6 +410,8 @@ function bindRootEvents() {
 function renderEditor() {
   renderMetaEditor();
   renderSectionEditor();
+  resizeTextareas();
+  focusPendingField();
 }
 
 function renderMetaEditor() {
@@ -420,9 +459,7 @@ function renderSectionEditor() {
         </div>
         <div class="section-card__blocks-head">
           <h3 class="panel__title">블록</h3>
-          <div class="block-card__actions">
-            ${BLOCK_TYPES.map(type => `<button class="btn btn--sm" type="button" data-action="add-block" data-section="${sectionIdx}" data-type="${type}">${type}</button>`).join("")}
-          </div>
+          ${renderBlockTypeButtons(sectionIdx)}
         </div>
         <div class="section-card__blocks" data-section="${sectionIdx}">
           ${current.blocks.length ? current.blocks.map((block, idx) => renderBlockEditor(block, sectionIdx, idx, `lesson.sections.${sectionIdx}.blocks.${idx}`)).join("") : `<p class="field__hint" style="margin:1rem 0 0;">아직 블록이 없습니다. 위 버튼으로 블록을 추가하세요.</p>`}
@@ -442,7 +479,7 @@ function renderBlockEditor(block, sectionIdx, blockIdx, basePath) {
           <strong class="block-card__index">#${blockIdx + 1}</strong>
           <span class="block-type-select">
             <select data-action="change-block-type" data-section="${sectionIdx}" data-block="${blockIdx}">
-              ${BLOCK_TYPES.map(type => `<option value="${type}" ${block.type === type ? "selected" : ""}>${type}</option>`).join("")}
+              ${getBlockTypeOptions(block.type).map(type => `<option value="${type}" ${block.type === type ? "selected" : ""}>${type}</option>`).join("")}
             </select>
           </span>
         </div>
@@ -459,10 +496,7 @@ function renderBlockEditor(block, sectionIdx, blockIdx, basePath) {
 }
 
 function renderFieldsForBlock(block, basePath) {
-  if (block.type === "구분선") return `<p class="field__hint">구분선은 추가 입력 없이 렌더링됩니다.</p>`;
-  if (block.type === "단락" || block.type === "소제목") {
-    return `<div class="form-grid">${textareaField("text", "텍스트", `${basePath}.text`)}</div>${commonImageFields(basePath)}`;
-  }
+  if (block.type === "단락" || block.type === "소제목") return `<div class="form-grid">${textareaField("text", "텍스트", `${basePath}.text`)}</div>`;
   if (block.type === "사례") {
     return `
       <div class="form-grid">
@@ -471,31 +505,26 @@ function renderFieldsForBlock(block, basePath) {
         ${textareaField("body", "본문", `${basePath}.body`)}
         ${textareaField("footer", "출처/부연", `${basePath}.footer`)}
         ${textareaField("answer", "답 보기", `${basePath}.answerText`, "줄마다 항목을 적으면 배열로 저장됩니다.")}
-        ${checkboxField("comments", "학생 의견 받기", `${basePath}.comments`)}
+        ${checkboxField("comments", "댓글 기능 활성화", `${basePath}.comments`)}
       </div>
-      ${commonImageFields(basePath)}
+      ${materialListEditor("첨부 자료", `${basePath}.materials`, "사례 본문 아래에 붙일 자료를 추가합니다.", `${basePath}.materialsLayout`)}
     `;
   }
   if (block.type === "개념") {
     return `
       <div class="form-grid">
         ${inputField("title", "개념 제목", `${basePath}.title`, "핵심 개념")}
-        ${textareaField("body", "본문", `${basePath}.body`)}
-        ${listTextarea("bullets", "불릿", `${basePath}.bullets`)}
-        ${textareaField("footer", "추가 설명", `${basePath}.footer`)}
+        ${textareaField("body", "본문", `${basePath}.body`, "`- `로 줄을 시작하면 불릿 기능이 지원됩니다.")}
       </div>
-      ${commonImageFields(basePath)}
+      ${materialListEditor("첨부 자료", `${basePath}.materials`, "개념 설명 아래에 붙일 자료를 추가합니다.", `${basePath}.materialsLayout`)}
     `;
   }
   if (block.type === "발문") {
     return `
       ${arrayEditor("질문", `${basePath}.prompts`, "prompt")}
       <div class="form-grid" style="margin-top:0.85rem;">
-        ${textareaField("conclusion", "마무리 문장", `${basePath}.conclusion`)}
-        ${checkboxField("comments", "학생 의견 받기", `${basePath}.comments`)}
+        ${checkboxField("comments", "댓글 기능 활성화", `${basePath}.comments`)}
       </div>
-      ${assetArrayEditor("이미지 2장 비교", `${basePath}.imagePair`, "imagePair")}
-      ${commonImageFields(basePath)}
     `;
   }
   if (block.type === "이미지곁글") {
@@ -513,25 +542,13 @@ function renderFieldsForBlock(block, basePath) {
   if (block.type === "미디어") {
     return `
       <div class="form-grid">
-        ${selectField("kind", "미디어 종류", `${basePath}.kind`, [["image", "이미지"], ["video", "YouTube 영상"], ["row", "이미지 여러 장"], ["text", "텍스트 컷아웃"]])}
-        ${assetInput("src", "이미지 키/URL", `${basePath}.src`)}
-        ${inputField("url", "영상 URL", `${basePath}.url`)}
-        ${inputField("caption", "캡션", `${basePath}.caption`)}
-        ${inputField("headline", "기사 제목", `${basePath}.headline`)}
-        ${textareaField("body", "기사 본문", `${basePath}.body`)}
-        ${inputField("source", "출처", `${basePath}.source`)}
+        ${selectField("layout", "표시 방식", `${basePath}.layout`, LAYOUT_OPTIONS)}
       </div>
-      ${assetArrayEditor("이미지 여러 장", `${basePath}.images`, "image")}
+      ${materialListEditor("자료", `${basePath}.items`, "이미지, 영상, 텍스트 자료 키를 같은 목록에 넣습니다.")}
+      ${legacyMediaFields(block, basePath)}
     `;
   }
   if (block.type === "기출문제") return arrayEditor("문제", `${basePath}.items`, "quiz");
-  if (block.type === "접이식") {
-    return `
-      <div class="form-grid">${inputField("summary", "접이식 제목", `${basePath}.summary`)}</div>
-      ${arrayEditor("하위 블록", `${basePath}.children`, "childBlock")}
-    `;
-  }
-  if (block.type === "요약") return listTextarea("items", "요약 항목", `${basePath}.items`);
   return "";
 }
 
@@ -603,14 +620,16 @@ function renderImageChips(images, basePath) {
 
 function arrayEditor(title, path, kind) {
   const items = getPath(path) || [];
+  const addLabel = kind === "quiz" ? "새 문제 추가" : "추가";
+  const emptyMessage = kind === "quiz" ? "현재 추가된 문제가 없습니다" : "항목을 추가하세요.";
   return `
     <div class="array-card">
       <div class="array-card__head">
         <strong>${title}</strong>
-        <button class="btn btn--sm" type="button" data-action="array-add" data-path="${path}" data-kind="${kind}">추가</button>
+        <button class="btn btn--sm" type="button" data-action="array-add" data-path="${path}" data-kind="${kind}">${addLabel}</button>
       </div>
       <div class="array-card__body row-list">
-        ${items.length ? items.map((item, idx) => renderArrayItem(item, idx, path, kind)).join("") : `<p class="field__hint">항목을 추가하세요.</p>`}
+        ${items.length ? items.map((item, idx) => renderArrayItem(item, idx, path, kind)).join("") : `<p class="field__hint">${emptyMessage}</p>`}
       </div>
     </div>
   `;
@@ -626,15 +645,13 @@ function renderArrayItem(item, idx, path, kind) {
         ${textareaField("note", "힌트/보충", `${itemPath}.note`)}
         ${textareaField("answer", "답", `${itemPath}.answer`)}
       </div>
+      ${materialListEditor("질문 첨부 자료", `${itemPath}.materials`, "이 질문 바로 아래에 붙일 자료를 추가합니다.", `${itemPath}.materialsLayout`)}
     `;
   } else if (kind === "quiz") {
     body = `
       <div class="form-grid">
         ${assetInput("image", "문제 이미지 키", `${itemPath}.image`)}
         ${textareaField("answer", "정답/해설", `${itemPath}.answerText`, "줄마다 항목을 적으면 배열로 저장됩니다.")}
-      </div>
-      <div class="field__hint" style="margin-top:0.5rem;">
-        <button class="btn btn--sm" type="button" data-action="pick-exam-items" data-path="${path}">기출문제 여러 개 추가</button>
       </div>
     `;
   } else if (kind === "childBlock") {
@@ -644,7 +661,7 @@ function renderArrayItem(item, idx, path, kind) {
           <div class="block-card__type">
             <strong>하위 #${idx + 1}</strong>
             <select data-action="change-child-type" data-path="${itemPath}">
-              ${BLOCK_TYPES.map(type => `<option value="${type}" ${item.type === type ? "selected" : ""}>${type}</option>`).join("")}
+              ${getBlockTypeOptions(item.type).map(type => `<option value="${type}" ${item.type === type ? "selected" : ""}>${type}</option>`).join("")}
             </select>
           </div>
         </summary>
@@ -701,21 +718,23 @@ function inputField(id, label, path, placeholder = "", hint = "") {
 }
 
 function textareaField(id, label, path, hint = "") {
+  const helpText = hint ? `${hint}<br>${TEXT_FORMAT_HINT}` : TEXT_FORMAT_HINT;
   return `
     <label class="field field--full">
       <span class="field__label">${label}</span>
       <textarea id="${id}" data-path="${path}" spellcheck="false">${escapeHtml(readDisplayValue(path))}</textarea>
-      ${hint ? `<span class="field__hint">${hint}</span>` : ""}
+      <span class="field__hint">${helpText}</span>
     </label>
   `;
 }
 
 function listTextarea(id, label, path, hint = "한 줄에 하나씩 적습니다.") {
+  const helpText = `${hint}<br>${TEXT_FORMAT_HINT}`;
   return `
     <label class="field field--full">
       <span class="field__label">${label}</span>
       <textarea id="${id}" data-path="${path}" data-kind="list" spellcheck="false">${escapeHtml((getPath(path) || []).join("\n"))}</textarea>
-      <span class="field__hint">${hint}</span>
+      <span class="field__hint">${helpText}</span>
     </label>
   `;
 }
@@ -802,6 +821,30 @@ function normalizeAnswer(value) {
   return lines;
 }
 
+function focusPendingField() {
+  if (!state.focusPath) return;
+  const path = state.focusPath;
+  state.focusPath = "";
+  requestAnimationFrame(() => {
+    const field = root.querySelector(`[data-path="${CSS.escape(path)}"]`);
+    if (!field) return;
+    field.focus();
+    if (typeof field.setSelectionRange === "function") {
+      const end = field.value.length;
+      field.setSelectionRange(end, end);
+    }
+  });
+}
+
+function resizeTextareas() {
+  root.querySelectorAll("textarea[data-path]").forEach(resizeTextarea);
+}
+
+function resizeTextarea(textarea) {
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight + 2}px`;
+}
+
 function refreshOutputs() {
   const json = JSON.stringify(cleanLesson({ includeComments: true }), null, 2);
   document.getElementById("json-output").value = json;
@@ -864,20 +907,98 @@ function cleanLesson({ includeComments }) {
 }
 
 function cleanBlock(block, includeComments) {
+  if (["구분선", "접이식", "요약"].includes(block.type)) return null;
   const copy = structuredClone(block);
   if (!includeComments) stripComments(copy);
+  normalizeMaterialArrays(copy);
   if (copy.type === "미디어") {
-    if (copy.kind !== "image") delete copy.src;
-    if (copy.kind !== "video") delete copy.url;
-    if (copy.kind !== "row") delete copy.images;
-    if (copy.kind !== "text") {
+    if (copy.item || copy.items || copy.materials) {
+      delete copy.kind;
+      delete copy.src;
+      delete copy.url;
+      delete copy.images;
+      delete copy.caption;
       delete copy.headline;
+      delete copy.body;
       delete copy.source;
-      if (copy.kind !== "image" && copy.kind !== "video") delete copy.caption;
-      if (copy.kind !== "text") delete copy.body;
+    } else {
+      if (copy.kind !== "image") delete copy.src;
+      if (copy.kind !== "video") delete copy.url;
+      if (copy.kind !== "row") delete copy.images;
+      if (copy.kind !== "text") {
+        delete copy.headline;
+        delete copy.source;
+        if (copy.kind !== "image" && copy.kind !== "video") delete copy.caption;
+        if (copy.kind !== "text") delete copy.body;
+      }
     }
   }
+  if (copy.type === "발문") {
+    delete copy.conclusion;
+    delete copy.materials;
+    delete copy.materialsLayout;
+  }
+  if (copy.type === "단락" || copy.type === "소제목") {
+    delete copy.materials;
+    delete copy.materialsLayout;
+  }
+  if (copy.type === "개념") {
+    delete copy.bullets;
+    delete copy.footer;
+  }
   return pruneEmpty(copy);
+}
+
+function normalizeMaterialArrays(value) {
+  if (!value || typeof value !== "object") return;
+  if (Array.isArray(value.materials)) value.materials = cleanMaterialArray(value.materials);
+  if (value.type === "미디어" && Array.isArray(value.items)) value.items = cleanMaterialArray(value.items);
+  Object.values(value).forEach(child => {
+    if (Array.isArray(child)) child.forEach(normalizeMaterialArrays);
+    else normalizeMaterialArrays(child);
+  });
+}
+
+function cleanMaterialArray(items) {
+  return items.map(item => {
+    if (!item || typeof item !== "object" || item.kind === "text") return item;
+    if (!item.caption && item.ref) return item.ref;
+    return item;
+  });
+}
+
+function renderBlockTypeButtons(sectionIdx) {
+  return `
+    <div class="block-type-groups">
+      ${BLOCK_TYPE_GROUPS.map(([label, types]) => `
+        <div class="block-type-group">
+          <span class="block-type-group__label">${escapeHtml(label)}</span>
+          <div class="block-card__actions">
+            ${types.map(type => `<button class="btn btn--sm" type="button" data-action="add-block" data-section="${sectionIdx}" data-type="${type}">${type}</button>`).join("")}
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function layoutButtonGroup(label, path) {
+  const value = getPath(path) || "stack";
+  return `
+    <div class="layout-button-field">
+      <span class="field__label">${label}</span>
+      <div class="layout-button-group">
+        ${LAYOUT_OPTIONS.map(([key, text]) => `
+          <button class="btn btn--sm layout-button ${value === key ? "is-active" : ""}" type="button" data-action="set-layout" data-path="${path}" data-value="${key}" aria-pressed="${value === key ? "true" : "false"}">${text}</button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function getBlockTypeOptions(currentType) {
+  if (BLOCK_TYPES.includes(currentType) || !LEGACY_BLOCK_TYPES.includes(currentType)) return BLOCK_TYPES;
+  return [...BLOCK_TYPES, currentType];
 }
 
 function stripComments(value) {
@@ -920,13 +1041,10 @@ async function loadAssetIndex() {
     const source = entries[resultIdx][0];
     parseCSV(result.value).forEach((columns, idx) => {
       if (idx === 0 || columns.length < 2) return;
-      const key = (columns[0] || "").trim();
-      const url = (columns[1] || "").trim();
-      const keywords = (columns[2] || "").split(",").map(v => v.trim()).filter(Boolean);
-      const reason = normalizeSheetText(columns[4] || "");
-      if (!key || !url || key === "JSON 상 호칭" || key === "JSON 코드") return;
-      map[key] = url;
-      rowsBySource[source].push({ key, url, keywords, reason, source });
+      const material = normalizeAssetColumns(columns);
+      if (!material) return;
+      map[material.key] = material;
+      rowsBySource[source].push({ ...material, assetSource: source });
     });
   });
   state.assetRows = rowsBySource;
@@ -1001,7 +1119,7 @@ function renderAssetResults() {
 function renderAssetSourceTabs(tabs) {
   if (!tabs) return;
   const sources = [
-    ["media", "이미지·동영상 DB", "기존 자료"],
+    ["media", "자료 DB", "이미지·영상·텍스트"],
     ["exam", "기출문제 DB", "문제 자료"],
     ["upload", "새 자료 등록", "클립보드"],
   ];
@@ -1018,8 +1136,8 @@ function renderMediaAssetResults(rows) {
     <button class="asset-result ${state.assetSelection.has(row.key) ? "is-selected" : ""}" type="button" data-action="choose-asset" data-key="${escapeAttr(row.key)}">
       <span class="asset-result__thumb">${renderAssetThumb(row)}</span>
       <span class="asset-result__content">
-        <span class="asset-result__key">${escapeHtml(row.key)}</span>
-        <span class="asset-result__meta">${escapeHtml(row.reason || row.keywords.join(", ") || "설명 없음")}</span>
+        <span class="asset-result__key">[${escapeHtml(row.kind || "자료")}] ${escapeHtml(row.title || row.headline || row.key)}</span>
+        <span class="asset-result__meta">${escapeHtml(row.caption || row.source || row.reason || row.keywords?.join(", ") || row.key)}</span>
       </span>
     </button>
   `).join("");
@@ -1040,6 +1158,116 @@ function renderExamAssetResults(rows, forceOpen = false) {
       ${Object.entries(sessions).map(([prefix, items]) => renderExamSession(prefix, currentSubject, items, forceOpen)).join("")}
     </div>
   `;
+}
+
+function legacyMediaFields(block, basePath) {
+  if (block.item || block.items || block.materials) return "";
+  const hasLegacyData = block.kind || block.src || block.url || block.caption || block.headline || block.body || block.source || block.images?.length;
+  if (!hasLegacyData) return "";
+  return `
+    <details class="array-card">
+      <summary class="array-card__head"><strong>구버전 직접 입력</strong></summary>
+      <div class="array-card__body">
+        <div class="form-grid">
+          ${selectField("kind", "미디어 종류", `${basePath}.kind`, [["image", "이미지"], ["video", "YouTube 영상"], ["row", "이미지 여러 장"], ["text", "텍스트 컷아웃"]])}
+          ${assetInput("src", "이미지 키/URL", `${basePath}.src`)}
+          ${inputField("url", "영상 URL", `${basePath}.url`)}
+          ${inputField("caption", "캡션", `${basePath}.caption`)}
+          ${inputField("headline", "기사 제목", `${basePath}.headline`)}
+          ${textareaField("body", "기사 본문", `${basePath}.body`)}
+          ${inputField("source", "출처", `${basePath}.source`)}
+        </div>
+        ${assetArrayEditor("이미지 여러 장", `${basePath}.images`, "image")}
+      </div>
+    </details>
+  `;
+}
+
+function materialListEditor(title, path, hint = "자료 DB 키, URL, 직접 텍스트를 순서대로 추가합니다.", layoutPath = null) {
+  const items = getPath(path) || [];
+  return `
+    <div class="array-card">
+      <div class="array-card__head">
+        <strong>${title}</strong>
+      </div>
+      <div class="array-card__body">
+        ${layoutPath ? layoutButtonGroup("표시 방식", layoutPath) : ""}
+        <div class="material-add-row">
+          <button class="btn btn--sm btn--primary" type="button" data-action="pick-assets" data-path="${path}">새 자료 추가</button>
+        </div>
+        <div class="field__hint">${escapeHtml(hint)}</div>
+        <div class="row-list material-editor-list">
+          ${items.length ? items.map((item, idx) => renderMaterialItem(item, idx, path)).join("") : `<p class="field__hint">선택된 자료가 없습니다.</p>`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMaterialItem(item, idx, path) {
+  const itemPath = `${path}.${idx}`;
+  const isText = item && typeof item === "object" && item.kind === "text";
+  const isObjectRef = item && typeof item === "object" && !isText;
+  const ref = isObjectRef ? item.ref : item;
+  const body = isText ? `
+    <div class="form-grid">
+      ${inputField(`material-title-${idx}`, "제목", `${itemPath}.title`)}
+      ${textareaField(`material-body-${idx}`, "본문", `${itemPath}.body`, "`## 제목`, `---`, `**강조**`, 불릿 문법을 사용할 수 있습니다.")}
+      ${inputField(`material-source-${idx}`, "출처", `${itemPath}.source`)}
+    </div>
+  ` : ref ? `
+    ${renderMaterialChip(item, idx, path)}
+  ` : `
+    <div class="form-grid">
+      ${assetInput(`material-ref-${idx}`, "자료 키/URL", itemPath)}
+    </div>
+  `;
+  return `
+    <div class="row-item material-editor-item">
+      <div class="material-editor-item__head">
+        <span class="material-editor-item__label">첨부 자료 ${idx + 1}</span>
+        <div class="inline-tools">
+          <button class="btn btn--sm" type="button" data-action="array-move" data-path="${path}" data-item="${idx}" data-dir="-1">위</button>
+          <button class="btn btn--sm" type="button" data-action="array-move" data-path="${path}" data-item="${idx}" data-dir="1">아래</button>
+          <button class="btn btn--sm btn--danger" type="button" data-action="array-delete" data-path="${path}" data-item="${idx}">삭제</button>
+        </div>
+      </div>
+      <div class="material-editor-item__body">${body}</div>
+    </div>
+  `;
+}
+
+function renderMaterialChip(item, idx, path) {
+  const itemPath = `${path}.${idx}`;
+  const isObjectRef = item && typeof item === "object";
+  const ref = isObjectRef ? item.ref : item;
+  const material = state.assetMap[ref] || {};
+  const kind = material.kind || (isObjectRef ? item.kind : "") || "자료";
+  const label = material.title || material.headline || ref;
+  const showKey = String(label || "").trim() !== String(ref || "").trim();
+  const meta = getMaterialMetaText(material);
+  return `
+    <div class="material-chip">
+      <div class="material-chip__body">
+        <span class="material-chip__kind">${escapeHtml(kind)}</span>
+        <span class="material-chip__title">${escapeHtml(label)}</span>
+        ${showKey ? `<span class="material-chip__key">${escapeHtml(ref)}</span>` : ""}
+        ${meta ? `<span class="material-chip__meta">${escapeHtml(meta)}</span>` : ""}
+      </div>
+      <div class="material-chip__actions">
+        ${isObjectRef ? `
+          ${inputField(`material-caption-${idx}`, "직접 표시할 캡션", `${itemPath}.caption`, "예: 영상의 핵심 장면")}
+          <button class="btn btn--sm" type="button" data-action="remove-material-caption" data-path="${path}" data-item="${idx}">캡션 제거</button>
+        ` : `<button class="btn btn--sm" type="button" data-action="add-material-caption" data-path="${path}" data-item="${idx}">캡션 추가</button>`}
+      </div>
+    </div>
+  `;
+}
+
+function getMaterialMetaText(material) {
+  if (!material || !Object.keys(material).length) return "";
+  if (material.kind === "text") return material.source || material.caption || material.reason || "";
+  return material.caption || material.source || material.reason || "";
 }
 
 function renderExamSubjectTab(subject, sessions, currentSubject) {
@@ -1075,7 +1303,7 @@ function renderExamSession(prefix, subject, items, forceOpen) {
 
 function renderExamAssetItem(row) {
   const selected = state.assetSelection.has(row.key);
-  const meta = row.reason || row.keywords.join(", ");
+  const meta = row.reason || row.keywords?.join(", ");
   return `
     <label class="asset-exam-item ${selected ? "is-selected" : ""}">
       <input type="checkbox" data-action="toggle-exam-asset" value="${escapeAttr(row.key)}" ${selected ? "checked" : ""}>
@@ -1147,8 +1375,32 @@ function formatExamPrefix(prefix) {
 }
 
 function getAssetSearchText(row) {
-  const meta = row.source === "exam" ? Object.values(parseExamKeyMeta(row.key)).join(" ") : "";
-  return [row.key, row.url, row.reason, meta, ...row.keywords].join(" ").toLowerCase();
+  return row.assetSource === "exam" ? getExamAssetSearchText(row) : getMediaAssetSearchText(row);
+}
+
+function getMediaAssetSearchText(row) {
+  return [
+    row.key,
+    row.title,
+    row.headline,
+    row.caption,
+    row.body,
+    row.source,
+    row.reason,
+    ...(row.keywords || []),
+  ].join(" ").toLowerCase();
+}
+
+function getExamAssetSearchText(row) {
+  const { tag, prefix } = parseExamKeyMeta(row.key);
+  return [
+    row.key,
+    tag,
+    prefix,
+    formatExamPrefix(prefix),
+    row.reason,
+    ...(row.keywords || []),
+  ].join(" ").toLowerCase();
 }
 
 function legacyRenderUploadPanel() {
@@ -1303,8 +1555,8 @@ async function legacyUploadClipboardAsset() {
 }
 
 function upsertAssetRow(row) {
-  state.assetMap[row.key] = row.url;
-  const nextRow = { ...row, source: "media" };
+  const nextRow = { kind: "image", keywords: [], reason: "", ...row, assetSource: "media" };
+  state.assetMap[row.key] = nextRow;
   const mediaRows = state.assetRows.media;
   const existing = mediaRows.find(asset => asset.key === row.key);
   if (existing) Object.assign(existing, nextRow);
@@ -1320,6 +1572,10 @@ function insertUploadedAssetKey(key) {
   if (!state.assetTarget) return;
   if (state.assetTarget.endsWith(".__commonImages")) {
     appendCommonImages(state.assetTarget.replace(/\.__commonImages$/, ""), [key]);
+  } else if (/\.materials$|\.items$/.test(state.assetTarget)) {
+    const current = Array.isArray(getPath(state.assetTarget)) ? getPath(state.assetTarget) : [];
+    if (!hasMaterialRef(current, key)) current.push(key);
+    setPath(state.assetTarget, current);
   } else if (Array.isArray(getPath(state.assetTarget))) {
     const current = getPath(state.assetTarget);
     if (!current.includes(key)) current.push(key);
@@ -1366,6 +1622,16 @@ function renderUploadPanel() {
       ? "이미지를 붙여넣고 JSON KEY를 확인한 뒤 확인을 누르세요."
       : "관리자 설정 필요: author.js의 ASSET_UPLOAD_ENDPOINT에 Apps Script /exec URL을 넣어주세요."
   );
+  const uploadedLink = upload.lastUrl ? `
+    <div class="asset-upload__link">
+      <span class="asset-upload__link-label">Drive link</span>
+      <a href="${escapeAttr(upload.lastUrl)}" target="_blank" rel="noopener">${escapeHtml(upload.lastUrl)}</a>
+      <div class="asset-upload__link-actions">
+        <button class="btn btn--sm" type="button" data-action="copy-upload-url">링크 복사</button>
+        <button class="btn btn--sm" type="button" data-action="insert-upload-url">현재 칸에 링크 넣기</button>
+      </div>
+    </div>
+  ` : "";
 
   panel.innerHTML = `
     <div class="asset-upload" tabindex="0">
@@ -1387,6 +1653,7 @@ function renderUploadPanel() {
         <button class="btn btn--sm" type="button" data-action="clear-upload-asset">초기화</button>
       </div>
       <div class="asset-upload__status">${escapeHtml(status)}</div>
+      ${uploadedLink}
     </div>
   `;
 }
@@ -1458,9 +1725,12 @@ async function uploadClipboardAsset() {
       reason: "",
     });
     clearExternalAssetCache();
-    insertUploadedAssetKey(data.key || key);
+    const uploadedKey = data.key || key;
+    insertUploadedAssetKey(uploadedKey);
     clearUploadAsset();
-    state.upload.status = "업로드했고 현재 입력칸에 JSON KEY를 넣었습니다.";
+    state.upload.lastKey = uploadedKey;
+    state.upload.lastUrl = driveUrl;
+    state.upload.status = "업로드했고 현재 입력칸에 JSON KEY를 넣었습니다. 아래 Drive 링크도 바로 사용할 수 있습니다.";
     renderEditor();
     refreshOutputs();
     renderAssetResults();
@@ -1476,7 +1746,43 @@ function clearUploadAsset() {
   state.upload.file = null;
   state.upload.dataUrl = "";
   state.upload.key = "";
+  state.upload.lastKey = "";
+  state.upload.lastUrl = "";
   state.upload.status = "";
+}
+
+function copyUploadedAssetUrl() {
+  const url = state.upload.lastUrl;
+  if (!url) return setUploadStatus("복사할 Drive 링크가 없습니다.");
+  navigator.clipboard?.writeText(url)
+    .then(() => setUploadStatus("Drive 링크를 복사했습니다."))
+    .catch(() => setUploadStatus("브라우저가 클립보드 복사를 막았습니다. 링크를 직접 선택해서 복사하세요."));
+}
+
+function insertUploadedAssetUrl() {
+  const url = state.upload.lastUrl;
+  if (!url) return setUploadStatus("넣을 Drive 링크가 없습니다.");
+  insertUploadedAssetValue(url);
+  state.upload.status = "현재 입력칸에 Drive 링크를 넣었습니다.";
+  renderEditor();
+  refreshOutputs();
+  renderAssetResults();
+}
+
+function insertUploadedAssetValue(value) {
+  if (!state.assetTarget) return;
+  if (state.assetTarget.endsWith(".__commonImages")) {
+    appendCommonImages(state.assetTarget.replace(/\.__commonImages$/, ""), [value]);
+  } else if (/\.materials$|\.items$/.test(state.assetTarget)) {
+    const current = Array.isArray(getPath(state.assetTarget)) ? getPath(state.assetTarget) : [];
+    if (!hasMaterialRef(current, value)) current.push(value);
+    setPath(state.assetTarget, current);
+  } else if (Array.isArray(getPath(state.assetTarget))) {
+    const current = getPath(state.assetTarget);
+    if (!current.includes(value)) current.push(value);
+  } else {
+    setPath(state.assetTarget, value);
+  }
 }
 
 function normalizeSheetText(value) {
@@ -1484,6 +1790,7 @@ function normalizeSheetText(value) {
 }
 
 function renderAssetThumb(row) {
+  if (row.kind === "text") return `<span class="asset-result__placeholder">텍스트</span>`;
   const src = getPreviewImageUrl(row.url);
   if (!src) return `<span class="asset-result__placeholder">자료</span>`;
   return `<img src="${escapeAttr(src)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'asset-result__placeholder', textContent: '자료' }))">`;
@@ -1568,13 +1875,20 @@ function applyAssetSelection() {
   const merged = [...current];
   const count = state.assetSelection.size;
   state.assetSelection.forEach(key => {
-    if (!merged.includes(key)) merged.push(key);
+    if (!hasMaterialRef(merged, key)) merged.push(key);
   });
   setPath(state.assetTarget, merged);
   closeAssetSearch();
   renderEditor();
   refreshOutputs();
   toast(`${count}개 키를 추가했습니다.`);
+}
+
+function hasMaterialRef(items, key) {
+  return items.some(item => {
+    if (item === key) return true;
+    return item && typeof item === "object" && item.ref === key;
+  });
 }
 
 function getDefaultAssetSource(path) {
@@ -1586,6 +1900,8 @@ function getAssetTargetLabel() {
   if (state.assetTarget.endsWith(".__commonImages")) return "공통 이미지";
   if (state.assetMode === "quiz-items") return "기출문제 여러 개";
   if (/\.items\.\d+\.image$/.test(state.assetTarget)) return "기출문제 이미지";
+  if (/\.materials(\.\d+)?$/.test(state.assetTarget)) return "첨부 자료";
+  if (/\.items(\.\d+)?$/.test(state.assetTarget)) return "자료";
   if (/\.imagePair(\.\d+)?$/.test(state.assetTarget)) return "이미지 2장 비교";
   if (/\.images(\.\d+)?$/.test(state.assetTarget)) return "이미지 여러 장";
   if (/\.src$/.test(state.assetTarget)) return "미디어 소스";
@@ -1696,7 +2012,7 @@ function createSampleLesson() {
         blocks: [
           { type: "단락", text: "본문은 이곳에 입력합니다. **굵게**와 줄바꿈을 사용할 수 있습니다." },
           { type: "발문", prompts: [{ q: "학생들에게 던질 질문을 적어보세요.", note: "", answer: "" }], comments: true },
-          { type: "개념", title: "핵심 개념", body: "개념 설명을 적습니다.", bullets: ["중요한 항목 1", "중요한 항목 2"] },
+          { type: "개념", title: "핵심 개념", body: "개념 설명을 적습니다.\n- 중요한 항목 1\n- 중요한 항목 2" },
         ],
       },
     ],
@@ -1716,23 +2032,17 @@ function createBlock(type) {
     case "단락":
     case "소제목":
       return { type, text: "" };
-    case "구분선":
-      return { type };
     case "사례":
-      return { type, title: "사례", body: "", footer: "", answer: "", comments: false };
+      return { type, title: "사례", body: "", footer: "", answer: "", comments: false, materials: [] };
     case "발문":
-      return { type, prompts: [{ q: "", note: "", answer: "" }], conclusion: "", comments: false, imagePair: [] };
+      return { type, prompts: [{ q: "", note: "", answer: "", materials: [] }], comments: false };
     case "개념":
-      return { type, title: "", body: "", bullets: [], footer: "" };
+      return { type, title: "", body: "", materials: [] };
     case "이미지곁글":
       return { type, kind: "concept", image: "", caption: "", title: "", body: "", note: "" };
     case "미디어":
-      return { type, kind: "image", src: "", url: "", caption: "", images: [], headline: "", body: "", source: "" };
+      return { type, layout: "stack", items: [] };
     case "기출문제":
-      return { type, items: [{ image: "", answer: "" }] };
-    case "접이식":
-      return { type, summary: "클릭해서 펼치기", children: [createBlock("단락")] };
-    case "요약":
       return { type, items: [] };
     default:
       return { type: "단락", text: "" };
@@ -1743,6 +2053,8 @@ function createArrayItem(kind) {
   if (kind === "prompt") return { q: "", note: "", answer: "" };
   if (kind === "quiz") return { image: "", answer: "" };
   if (kind === "childBlock") return createBlock("단락");
+  if (kind === "materialRef") return "";
+  if (kind === "materialText") return { kind: "text", title: "", body: "", source: "" };
   return "";
 }
 
@@ -1779,6 +2091,23 @@ function moveItem(list, index, dir) {
   if (!Array.isArray(list) || next < 0 || next >= list.length) return;
   const [item] = list.splice(index, 1);
   list.splice(next, 0, item);
+}
+
+function addMaterialCaption(path, index) {
+  const list = getPath(path);
+  if (!Array.isArray(list)) return;
+  const item = list[index];
+  if (!item || typeof item !== "string") return;
+  list[index] = { ref: item, caption: "" };
+  state.focusPath = `${path}.${index}.caption`;
+}
+
+function removeMaterialCaption(path, index) {
+  const list = getPath(path);
+  if (!Array.isArray(list)) return;
+  const item = list[index];
+  if (!item || typeof item !== "object" || item.kind === "text") return;
+  list[index] = item.ref || "";
 }
 
 function startBlockSort(event, handle) {

@@ -593,6 +593,59 @@ ul.md-list li {
 }
 
 /* ---------- media 블록 ---------- */
+.materials {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.materials--embedded {
+  margin: 1rem 0;
+}
+
+.materials--row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+}
+
+.materials--figure {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.72fr) minmax(300px, 1.28fr);
+  align-items: center;
+}
+
+.material {
+  min-width: 0;
+}
+
+.material--image {
+  margin: 0;
+}
+
+.material--image img {
+  width: 100%;
+  display: block;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.material--link {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.material--link a {
+  color: var(--brand);
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .media {
   margin: 1.5rem 0;
   border-radius: var(--radius-lg);
@@ -656,6 +709,12 @@ ul.md-list li {
   line-height: 1.4;
   border-top: 1px solid var(--border);
   background: #fff;
+}
+
+@media (max-width: 760px) {
+  .materials--figure {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ---------- 하단 내비게이션 ---------- */
@@ -757,6 +816,15 @@ b {
   font-weight: 800;
   color: var(--accent);
   /* 본문 내 **볼드** → 빨강 키워드 하이라이트 (슬라이드 톤) */
+}
+
+.md-accent-line {
+  display: inline-block;
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 1.06em;
+  font-weight: 800;
+  line-height: 1.55;
 }
 
 em {

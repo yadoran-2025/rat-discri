@@ -58,15 +58,15 @@ python -m http.server 8000
 상세한 블록 예시는 **[블록 가이드 갤러리](?lesson=block-guide)**에서 직접 확인할 수 있습니다.
 
 ### 주요 블록
-- `paragraph`, `heading`: 기본 텍스트 및 소제목
-- `case`, `question`: 🟩사례 및 🗨️질문 박스 (실시간 댓글 지원)
-- `concept`: 💡핵심 개념 정리 박스
-- `figure-concept`, `figure-quote`: 인물 사진 기반 레이아웃
-- `quiz-accordion`: 기출문제 및 해설 접이식 목록
+- `소제목`, `단락`: 기본 텍스트 구조
+- `사례`, `발문`, `개념`: 수업 활동 블록 (`materials` 첨부 가능)
+- `미디어`: 자료 DB의 이미지·영상·텍스트를 `items` 배열로 표시
+- `기출문제`: 문제 이미지와 해설 목록
 
-### 특수 입력 포맷
-이미지 키 위치에 아래 형식을 사용하면 더 풍부한 화면을 구성할 수 있습니다.
-- **텍스트 컷아웃**: `text:##제목\n내용\n---\n출처` 형식으로 입력 시 신문 기사 스타일 렌더링.
+### 자료 DB 및 특수 입력 포맷
+이미지, 영상, 텍스트는 같은 자료 DB에서 관리할 수 있습니다. 권장 열 구조는 `key | kind | title | content/url | caption/source | keywords`입니다.
+- **텍스트 자료**: `kind`가 `text`이면 `content/url` 칸의 내용을 텍스트 컷아웃으로 렌더링합니다. `kind`가 없어도 URL이 아니거나 `"`로 시작하면 텍스트로 추론합니다.
+- **텍스트 컷아웃 문법**: 텍스트 첫 줄 `## 제목`, 단독 줄 `---` 이후 출처, `### 파란 강조문`, `**강조**`, 불릿 목록이 유지됩니다. `text:` 접두사는 구버전 호환용으로만 남아 있습니다.
 - **유튜브**: 유튜브 URL 입력 시 자동으로 썸네일 생성 및 재생 링크 연결.
 - **구글 드라이브**: 공유 링크 입력 시 자동으로 이미지 URL로 변환하여 로드.
 
@@ -83,7 +83,7 @@ python -m http.server 8000
 ## 📝 수업 자료 추가 가이드
 1. `lessons/` 폴더에 새로운 `.json` 파일을 생성합니다.
 2. `js/app.js`의 `showDashboard()` 함수 내 `lessons` 배열에 새 수업 정보를 추가하면 대시보드에 자동으로 노출됩니다.
-3. 구글 스프레드시트와 연동하여 에셋(이미지, 텍스트)을 관리하려면 `app.js`의 `SHEET_URLS`를 수정하세요.
+3. 구글 스프레드시트와 연동하여 에셋(이미지, 영상, 텍스트)을 관리하려면 `js/api.js`의 `ASSET_SHEET_URLS`를 수정하세요.
 
 JSON 최상위 필드 예시:
 
@@ -98,36 +98,46 @@ JSON 최상위 필드 예시:
   "next": "다음_차시_id 또는 null",
   "sections": [...]
 }
+```
 
-- `paragraph` — 일반 단락
-- `heading` — 섹션 내부 소제목
-- `case` — 🟩 초록 사례 박스 (답 토글 가능)
-- `question` — 🗨️ 파란 질문 박스 (여러 하위 질문, 이미지쌍, 결론)
-- `concept` — 💡 회색 개념 정의 (제목, 본문, 불릿, 이미지)
-- `figure-concept` — 인물 사진 + 개념 정의
-- `figure-quote` — 인물 사진 + 인용문
-- `image-row` — 이미지 여러 개 가로 나열
-- `expandable` — 접어둘 수 있는 하위 블록 모음
-- `summary` — 차시 요약 (번호 목록)
-- `media` — 영상 링크 또는 독립 이미지 (하위 `kind` 필드로 구분)
-  - `kind: "video-link"` — YouTube 썸네일 + 클릭 시 새 탭으로 영상 열림
-    ```json
-    {
-      "type": "media",
-      "kind": "video-link",
-      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
-      "caption": "영상 설명 (선택)"
-    }
-    ```
-    지원 URL 형식: `youtube.com/watch?v=`, `youtu.be/`, `youtube.com/embed/`
-  - `kind: "image"` — 단독 이미지 + 캡션
-    ```json
-    {
-      "type": "media",
-      "kind": "image",
-      "src": "파일명.jpg",
-      "caption": "이미지 설명 (선택)"
-    }
-    ```
+- `소제목` — 섹션 내부 소제목
+- `단락` — 일반 단락
+- `사례` — 초록 사례 박스 (답 토글 가능)
+- `발문` — 질문 박스 (여러 하위 질문, 질문별 자료)
+- `개념` — 개념 정의 (제목, 본문, 첨부 자료; 본문에서 `- ` 불릿 사용 가능)
+- `미디어` — 자료 DB의 이미지·영상·텍스트를 같은 목록으로 표시
+  ```json
+  {
+    "type": "미디어",
+    "layout": "stack",
+    "items": [
+      "constitution-11",
+      { "ref": "allport", "caption": "고든 올포트" },
+      { "kind": "text", "title": "직접 텍스트", "body": "본문 **강조**" }
+    ]
+  }
+  ```
+- `기출문제` — 기출문제 이미지와 해설 (`items[].image`는 문제 전용 구조로 유지)
+- `사례`, `발문`, `개념` 블록에는 `materials` 배열을 붙여 활동 내부에 자료를 첨부할 수 있습니다.
+  ```json
+  {
+    "type": "발문",
+    "prompts": [
+      {
+        "q": "이 조항이 금지하는 차별 기준은 무엇인가요?",
+        "materials": ["constitution-11"]
+      }
+    ],
+    "materialsLayout": "row",
+    "materials": ["intro-video"]
+  }
+  ```
+
+기존 수업 JSON을 새 구조로 변환하려면 먼저 dry-run으로 확인한 뒤 `--write`를 붙여 실행합니다.
+
+```bash
+node scripts/migrate-lessons.mjs
+node scripts/migrate-lessons.mjs --write
+```
 
 본문에서 `**볼드**`는 강조로, 줄바꿈은 그대로 렌더됩니다.

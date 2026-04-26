@@ -1,4 +1,5 @@
 import { app } from "./state.js";
+import { inferMaterialKind, stripTextMarker, parseTextCutoutContent } from "./utils.js";
 
 export const ASSET_SHEET_URLS = {
   media: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8z4eMwA6UaQLgnZTtj7Xk7-EzBagOfK8YDGUvfogcIa1RV_3h07ggcI2nbN93JbFFdciC9A6uph_4/pub?output=csv",
@@ -7,7 +8,7 @@ export const ASSET_SHEET_URLS = {
 
 export const SHEET_URLS = [ASSET_SHEET_URLS.media, ASSET_SHEET_URLS.exam];
 
-const CACHE_KEY = "externalAssets_v1";
+const CACHE_KEY = "externalAssets_v2";
 const CACHE_TTL = 60 * 60 * 1000; // 1시간
 
 function loadFromCache() {
@@ -49,15 +50,82 @@ export async function loadExternalAssets() {
     if (result.status !== "fulfilled") continue;
     parseCSV(result.value).forEach(columns => {
       if (columns.length < 2) return;
-      const key = columns[0].trim();
-      const assetUrl = columns[1].trim();
-      if (!key || !assetUrl || key === "JSON 상 호칭" || key === "JSON 코드") return;
-      assets[key] = assetUrl;
+      const material = normalizeAssetColumns(columns);
+      if (!material) return;
+      assets[material.key] = material;
     });
   }
 
   saveToCache(assets);
   Object.assign(app.lesson.assets, assets);
+}
+
+export function normalizeAssetColumns(columns) {
+  const key = (columns[0] || "").trim();
+  if (!key || key === "JSON 상 호칭" || key === "JSON 코드" || /^key$/i.test(key)) return null;
+
+  const second = (columns[1] || "").trim();
+  const looksLikeTypedRow = /^(image|video|text|link)$/i.test(second);
+
+  if (looksLikeTypedRow) {
+    const kind = second.toLowerCase();
+    const title = normalizeSheetText(columns[2] || "");
+    const value = normalizeSheetText(columns[3] || "");
+    const meta = normalizeSheetText(columns[4] || "");
+    const keywords = splitKeywords(columns[5] || "");
+    return buildMaterial({ key, kind, title, value, meta, keywords });
+  }
+
+  const value = normalizeSheetText(second);
+  const keywords = splitKeywords(columns[2] || "");
+  const inferredKind = inferMaterialKind(value);
+  const reason = inferredKind === "text"
+    ? normalizeSheetText(columns[4] || columns[3] || "")
+    : normalizeSheetText(columns[4] || columns[3] || "");
+  return buildMaterial({ key, value, meta: reason, keywords, reason });
+}
+
+function buildMaterial({ key, kind = "", title = "", value = "", meta = "", keywords = [], reason = "" }) {
+  const inferredKind = inferMaterialKind(value, kind);
+  const material = {
+    key,
+    kind: inferredKind,
+    title,
+    keywords,
+    reason,
+  };
+
+  if (inferredKind === "text") {
+    const parsed = parseTextCutoutContent(stripTextMarker(value));
+    material.headline = title || parsed.headline || "";
+    material.body = parsed.body;
+    material.source = meta || parsed.source || "";
+  } else {
+    material.url = value;
+    material.caption = meta || "";
+  }
+
+  return pruneEmpty(material);
+}
+
+function splitKeywords(value) {
+  return String(value || "").split(",").map(item => item.trim()).filter(Boolean);
+}
+
+function normalizeSheetText(value) {
+  return String(value || "").replace(/\\n/g, "\n").trim();
+}
+
+function pruneEmpty(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (!value || typeof value !== "object") return value;
+  const out = {};
+  Object.entries(value).forEach(([key, child]) => {
+    if (child === "" || child == null) return;
+    if (Array.isArray(child) && !child.length) return;
+    out[key] = child;
+  });
+  return out;
 }
 
 /**
