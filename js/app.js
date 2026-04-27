@@ -3,7 +3,7 @@ import { loadExternalAssets } from "./api.js";
 import { showDashboard } from "./ui/dashboard.js";
 import { buildAppShell, renderSidebar, renderNavFooter, bindKeyboard, toggleFirstVisibleAnswer } from "./ui/layout.js";
 import { closeImageLightbox, closeFocusOverlay, closeBlockFullscreen, navigateBlockFullscreen } from "./ui/components.js";
-import { renderBlock, renderDivider } from "./ui/blocks.js";
+import { renderBlock, renderBlockSeparator } from "./ui/blocks.js";
 import { escapeHtml } from "./utils.js";
 
 /* ====================================================================
@@ -111,13 +111,15 @@ function renderSection(sec) {
   `;
   main.appendChild(header);
 
+  let previousBlockType = null;
   sec.blocks.forEach((block, idx) => {
     const el = renderBlock(block, idx);
     if (el) {
+      if (previousBlockType && previousBlockType !== "구분선" && block.type !== "구분선") {
+        main.appendChild(renderBlockSeparator());
+      }
       main.appendChild(el);
-    }
-    if (sec.blocks[idx + 1] && block.type !== "소제목") {
-      main.appendChild(renderDivider());
+      previousBlockType = block.type;
     }
   });
 }

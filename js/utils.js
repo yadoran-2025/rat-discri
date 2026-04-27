@@ -59,15 +59,14 @@ export function stripTextMarker(value) {
 
 export function inferMaterialKind(value, explicitKind = "") {
   const kind = String(explicitKind || "").trim().toLowerCase();
-  if (kind === "link") return "image";
-  if (["image", "video", "text"].includes(kind)) return kind;
+  if (["image", "video", "text", "link"].includes(kind)) return kind;
 
   const text = String(value ?? "").trim();
   if (!text) return "text";
   if (/^text:/i.test(text) || /^["“]/.test(text)) return "text";
   if (extractYouTubeId(text)) return "video";
   if (isImageLikeUrl(text)) return "image";
-  if (isHttpUrl(text)) return "image";
+  if (isHttpUrl(text)) return "link";
   return "text";
 }
 
@@ -81,8 +80,10 @@ export function inferMaterialKind(value, explicitKind = "") {
 export function formatInline(text) {
   if (!text) return "";
 
-  const lines = text.split("\n");
-  const inline = s => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const lines = text.replace(/\t/g, "  ").split("\n");
+  const inline = s => escapeHtml(s)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^\*])\*([^\*\n]+?)\*(?!\*)/g, "$1<strong>$2</strong>");
 
   let out = "";
   let inUl = false;

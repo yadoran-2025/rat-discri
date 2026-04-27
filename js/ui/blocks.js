@@ -12,6 +12,7 @@ import { attachFocusAffordance, openImageLightbox } from "./components.js";
 
 const FULLSCREEN_TYPES  = new Set(['사례', '발문', '개념', '이미지곁글', '미디어', '기출문제']);
 const IMG_SELF_HANDLED  = new Set(['이미지곁글', '미디어']); // 자체적으로 이미지를 처리하는 블록
+const linkPreviewCache = new Map();
 
 /**
  * 블록 디스패처: 타입에 맞는 렌더러 호출
@@ -27,7 +28,12 @@ export function renderBlock(block, blockIdx) {
   const map = {
     단락:      renderParagraph,
     소제목:    renderHeading,
-    구분선:    () => null,
+    절:        renderSubsection,
+    구분선:    renderDivider,
+    인용:      renderQuote,
+    그룹:      renderGroup,
+    토글:      renderToggle,
+    텍스트박스: renderTextBox,
     사례:      renderCase,
     발문:      renderQuestion,
     개념:      renderConcept,
@@ -60,10 +66,15 @@ export function renderBlock(block, blockIdx) {
 /* ── 기본 텍스트 ── */
 
 function renderParagraph(block) {
-  const p = document.createElement("p");
-  p.className = "block paragraph";
-  p.innerHTML = formatInline(block.text);
-  return p;
+  const wrap = document.createElement("div");
+  wrap.className = "block paragraph";
+  if (block.text) {
+    const p = document.createElement("p");
+    p.innerHTML = formatInline(block.text);
+    wrap.appendChild(p);
+  }
+  appendAsides(wrap, block.asides);
+  return wrap;
 }
 
 function renderHeading(block) {
@@ -73,9 +84,52 @@ function renderHeading(block) {
   return h;
 }
 
+function renderSubsection(block) {
+  const h = document.createElement("h3");
+  h.className = "block section-sub-section";
+  h.innerHTML = formatInline(block.text || "");
+  return h;
+}
+
+function renderQuote(block) {
+  const div = document.createElement("blockquote");
+  div.className = "block quote-block";
+  div.innerHTML = formatInline(block.body || block.text || "");
+  appendAsides(div, block.asides);
+  return div;
+}
+
+function renderGroup(block) {
+  return buildObjectGroup(block.items || [], block.layout || "row", "block");
+}
+
+function renderToggle(block) {
+  const div = document.createElement("div");
+  div.className = "block toggle-block";
+  div.appendChild(buildAnswer(block.body || block.text || block.answer || "", block.label || "내용 보기"));
+  return div;
+}
+
+function renderTextBox(block) {
+  const div = buildTextCutout({
+    title: block.title,
+    body: block.body || block.text || "",
+    source: block.source,
+  });
+  div.classList.add("block");
+  appendAsides(div, block.asides);
+  return div;
+}
+
 export function renderDivider() {
   const hr = document.createElement("hr");
   hr.className = "block divider";
+  return hr;
+}
+
+export function renderBlockSeparator() {
+  const hr = document.createElement("hr");
+  hr.className = "block-separator";
   return hr;
 }
 
@@ -95,26 +149,29 @@ function renderCallout(block, defaultStyle) {
     return tc;
   }
 
-  const title  = block.title  ?? block.label ?? null;
+  const title  = block.title  ?? block.label ?? (defaultStyle === "case" ? "사례" : null);
   const body   = block.body   ?? block.text  ?? null;
   const footer = style === "concept" ? null : block.footer ?? block.sub ?? null;
 
   const div = document.createElement("div");
   div.className = `block callout ${style}`;
 
-  let html = "";
   if (style === "concept") {
-    if (title)         html += `<div class="concept__title">${escapeHtml(title)}</div>`;
-    if (body)          html += `<div class="concept__body">${formatInline(body)}</div>`;
+    if (title) div.appendChild(buildTextElement("div", "concept__title", title, false));
+    if (block.flow?.length) appendFlow(div, block.flow, "concept__body");
+    else if (body) div.appendChild(buildTextElement("div", "concept__body", formatInline(body)));
   } else {
-    if (title)  html += `<div class="callout__label">${escapeHtml(title)}</div>`;
-    if (body)   html += `<div class="case__text">${formatInline(body)}</div>`;
-    if (footer) html += `<div class="case__sub">${formatInline(footer)}</div>`;
+    if (title) div.appendChild(buildTextElement("div", "callout__label", title, false));
+    if (block.flow?.length) appendFlow(div, block.flow, "case__text");
+    else if (body) div.appendChild(buildTextElement("div", "case__text", formatInline(body)));
+    if (footer) div.appendChild(buildTextElement("div", "case__sub", formatInline(footer)));
   }
-  div.innerHTML = html;
 
-  appendMaterials(div, block.materials, block.materialsLayout);
-  if (block.answer) div.appendChild(buildAnswer(block.answer));
+  if (!block.flow?.length) {
+    appendMaterials(div, block.materials, block.materialsLayout);
+    appendAsides(div, block.asides);
+  }
+  if (block.answer && !hasFlowAnswer(block.flow)) div.appendChild(buildAnswer(block.answer));
   return div;
 }
 
@@ -146,15 +203,50 @@ function renderQuestion(block, blockIdx) {
   const commentSections = [];
 
   block.prompts.forEach((pr, promptIdx) => {
-    const p = document.createElement("div");
-    p.className = "question__prompt";
-    p.innerHTML = `Q. ${formatInline(pr.q)}`;
-    if (pr.note) p.innerHTML += `<div class="question__note">${formatInline(pr.note)}</div>`;
-    div.appendChild(p);
-    appendMaterials(div, pr.materials, pr.materialsLayout);
+    if (pr.flow?.length) {
+      const firstTextIdx = pr.flow.findIndex(item => item.type === "text");
+      pr.flow.forEach((item, flowIdx) => {
+        if (item.type === "materials") {
+          appendMaterials(div, item.items, item.layout);
+          return;
+        }
+        if (item.type === "divider") {
+          const divider = document.createElement("hr");
+          divider.className = "md-divider";
+          div.appendChild(divider);
+          return;
+        }
+        if (item.type === "answer") {
+          div.appendChild(buildAnswer(item.answer, "답 보기"));
+          return;
+        }
+        if (item.type === "quote") {
+          div.appendChild(renderFlowQuote(item));
+          return;
+        }
+        if (item.type === "group") {
+          div.appendChild(buildObjectGroup(item.items, item.layout || "row"));
+          return;
+        }
+        const p = document.createElement("div");
+        p.className = "question__prompt";
+        const prefix = flowIdx === firstTextIdx ? "Q. " : "";
+        p.innerHTML = `${prefix}${formatInline(item.text || "")}`;
+        if (item.asides?.length) p.innerHTML += renderAsideHtml(item.asides, "question__note");
+        div.appendChild(p);
+      });
+    } else {
+      const p = document.createElement("div");
+      p.className = "question__prompt";
+      p.innerHTML = `Q. ${formatInline(pr.q)}`;
+      if (pr.note) p.innerHTML += `<div class="question__note">${formatInline(pr.note)}</div>`;
+      if (pr.asides?.length) p.innerHTML += renderAsideHtml(pr.asides, "question__note");
+      div.appendChild(p);
+      appendMaterials(div, pr.materials, pr.materialsLayout);
+    }
 
     // answer는 항상 { text } 또는 { bullets } 객체
-    if (pr.answer) div.appendChild(buildAnswer(pr.answer, "답 보기"));
+    if (pr.answer && !hasFlowAnswer(pr.flow)) div.appendChild(buildAnswer(pr.answer, "답 보기"));
 
     if (block.comments) {
       const commentKey = `${lessonId}__${sectionId}__b${bIdx}__p${promptIdx}`;
@@ -195,6 +287,96 @@ function appendCommentSection(parent, key, variant, label = null) {
 
 function renderConcept(block) {
   return renderCallout(block, "concept");
+}
+
+function appendFlow(parent, flow, textClass) {
+  flow.forEach(item => {
+    if (item.type === "materials") {
+      appendMaterials(parent, item.items, item.layout);
+      return;
+    }
+    if (item.type === "divider") {
+      const divider = document.createElement("hr");
+      divider.className = "md-divider";
+      parent.appendChild(divider);
+      return;
+    }
+    if (item.type === "answer") {
+      parent.appendChild(buildAnswer(item.answer, "답 보기"));
+      return;
+    }
+    if (item.type === "quote") {
+      parent.appendChild(renderFlowQuote(item));
+      return;
+    }
+    if (item.type === "group") {
+      parent.appendChild(buildObjectGroup(item.items, item.layout || "row"));
+      return;
+    }
+    const text = document.createElement("div");
+    text.className = textClass;
+    text.innerHTML = formatInline(item.text || "");
+    parent.appendChild(text);
+    appendAsides(parent, item.asides);
+  });
+}
+
+function renderFlowQuote(item) {
+  const quote = renderQuote({ body: item.body || item.text || "" });
+  quote.classList.remove("block");
+  return quote;
+}
+
+function buildObjectGroup(items, layout = "row", extraClass = "") {
+  const wrap = document.createElement("div");
+  wrap.className = `object-group object-group--${normalizeLayout(layout)} ${extraClass}`.trim();
+  asArray(items).forEach(item => {
+    const child = buildObjectGroupItem(item);
+    if (child) wrap.appendChild(child);
+  });
+  return wrap;
+}
+
+function buildObjectGroupItem(item) {
+  if (typeof item === "string" || item?.ref) {
+    const material = resolveMaterial(typeof item === "string" ? item : item.ref);
+    return material ? buildMaterial(material) : null;
+  }
+  if (item?.type === "인용") {
+    const quote = renderQuote(item);
+    quote.classList.remove("block");
+    return quote;
+  }
+  return renderBlock(item);
+}
+
+function hasFlowAnswer(flow) {
+  return Array.isArray(flow) && flow.some(item => item?.type === "answer");
+}
+
+function buildTextElement(tag, className, html, alreadyFormatted = true) {
+  const el = document.createElement(tag);
+  el.className = className;
+  if (alreadyFormatted) el.innerHTML = html;
+  else el.textContent = html;
+  return el;
+}
+
+function appendAsides(parent, asides) {
+  const items = asArray(asides).map(item => String(item || "").trim()).filter(Boolean);
+  if (!items.length) return;
+  const wrap = document.createElement("div");
+  wrap.className = "soft-asides";
+  wrap.innerHTML = items.map(item => `<div class="soft-aside">${formatInline(item)}</div>`).join("");
+  parent.appendChild(wrap);
+}
+
+function renderAsideHtml(asides, className = "soft-aside") {
+  return asArray(asides)
+    .map(item => String(item || "").trim())
+    .filter(Boolean)
+    .map(item => `<div class="${className}">${formatInline(item)}</div>`)
+    .join("");
 }
 
 /* ── 레이아웃 ── */
@@ -399,6 +581,10 @@ function buildMaterial(material) {
     return buildVideoMaterial(material.url || material.src || material.value || material.key, material.caption || "");
   }
 
+  if (material.kind === "link") {
+    return buildLinkMaterial(material.url || material.src || material.value || material.key, material.caption || material.title || "");
+  }
+
   const figure = document.createElement("figure");
   figure.className = "material material--image";
   figure.appendChild(buildImage(material.url || material.src || material.value || material.key, material.caption || material.title || ""));
@@ -409,6 +595,75 @@ function buildMaterial(material) {
     figure.appendChild(cap);
   }
   return figure;
+}
+
+function buildLinkMaterial(url, label = "") {
+  const href = String(url || "").trim();
+  const article = document.createElement("article");
+  article.className = "material material--link-card";
+  article.dataset.url = href;
+
+  let host = href;
+  try {
+    host = new URL(href).hostname.replace(/^www\./, "");
+  } catch { }
+
+  article.innerHTML = `
+    <a class="material-link-card__anchor" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">
+      <span class="material-link-card__body">
+        <span class="material-link-card__title">${escapeHtml(label || host || href)}</span>
+        <span class="material-link-card__desc">${escapeHtml(host || "")}</span>
+        <span class="material-link-card__url">${escapeHtml(href)}</span>
+      </span>
+      <span class="material-link-card__thumb" hidden></span>
+    </a>
+  `;
+  hydrateLinkPreview(article, href, label);
+  return article;
+}
+
+function hydrateLinkPreview(card, href, label = "") {
+  if (!href || !/^https?:\/\//i.test(href)) return;
+  getLinkPreview(href)
+    .then(meta => {
+      if (!meta || !card.isConnected) return;
+      const title = card.querySelector(".material-link-card__title");
+      const desc = card.querySelector(".material-link-card__desc");
+      const thumb = card.querySelector(".material-link-card__thumb");
+      if (title && !label && meta.title) title.textContent = meta.title;
+      if (desc && meta.description) desc.textContent = meta.description;
+      if (thumb && meta.image) {
+        const img = document.createElement("img");
+        img.src = meta.image;
+        img.alt = "";
+        img.loading = "lazy";
+        img.onerror = () => {
+          thumb.hidden = true;
+          thumb.innerHTML = "";
+        };
+        thumb.innerHTML = "";
+        thumb.appendChild(img);
+        thumb.hidden = false;
+      }
+    })
+    .catch(() => {});
+}
+
+function getLinkPreview(href) {
+  if (linkPreviewCache.has(href)) return linkPreviewCache.get(href);
+  const request = fetch(`https://api.microlink.io/?url=${encodeURIComponent(href)}`)
+    .then(response => response.ok ? response.json() : null)
+    .then(data => {
+      if (data?.status !== "success") return null;
+      return {
+        title: data.data?.title || "",
+        description: data.data?.description || "",
+        image: data.data?.image?.url || "",
+      };
+    })
+    .catch(() => null);
+  linkPreviewCache.set(href, request);
+  return request;
 }
 
 function buildVideoMaterial(url, caption = "") {
@@ -462,10 +717,14 @@ function buildAnswer(answer, label = "답 보기") {
   const content = document.createElement("div");
   content.className = "answer__content";
   if (Array.isArray(answer)) {
-    let html = "<ul>";
-    answer.forEach(b => { html += `<li>${formatInline(b)}</li>`; });
-    html += "</ul>";
-    content.innerHTML = html;
+    if (answer.some(item => /^- /.test(String(item || "").trim()))) {
+      content.innerHTML = formatInline(answer.join("\n"));
+    } else {
+      let html = "<ul>";
+      answer.forEach(b => { html += `<li>${formatInline(b)}</li>`; });
+      html += "</ul>";
+      content.innerHTML = html;
+    }
   } else {
     content.innerHTML = `<p>${formatInline(answer)}</p>`;
   }

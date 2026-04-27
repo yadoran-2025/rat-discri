@@ -1,7 +1,8 @@
 import { app } from "./state.js";
 import { ASSET_SHEET_URLS, parseCSV, normalizeAssetColumns } from "./api.js";
-import { renderBlock, renderDivider } from "./ui/blocks.js";
+import { renderBlock, renderBlockSeparator } from "./ui/blocks.js";
 import { escapeHtml } from "./utils.js";
+import { parseLessonMarkup, stringifyLessonMarkup } from "./lesson-markup.js";
 
 const BLOCK_TYPE_GROUPS = [
   ["기본", ["소제목", "단락"]],
@@ -14,11 +15,53 @@ const LOCAL_CACHE_KEY = "lessonAuthorDraft_v2";
 const EXTERNAL_ASSETS_CACHE_KEY = "externalAssets_v2";
 const LAYOUT_OPTIONS = [["stack", "아래로 나열"], ["row", "옆으로 나열"], ["figure", "사진+인용"]];
 const TEXT_FORMAT_HINT = "`### 강조문`을 쓰면 파란 강조 글씨로, `**강조**`는 굵은 강조로 표시됩니다.";
+const MARKUP_GUIDE_TEXT = `## 장 제목
+### 절 제목
+
+일반 문단은 그대로 씁니다.
+- 불릿
+  - 하위 불릿
+%힌트, 출처, 부연처럼 얕게 흘릴 내용%
+
+[사례
+사례 본문
+[[자료키]]
+<a>
+답 보기 내용
+</a>
+]
+
+[발문
+질문 내용
+]
+
+[개념
+개념 설명
+]
+
+[[자료1]] ~ [[자료2]]
+{{인용문}} ~ {{다른 인용문}}
+
+---
+구분선
+
+>>
+토글 박스
+>>
+
+\`\`\`
+텍스트 박스
+\`\`\``;
 // Paste the deployed Google Apps Script Web App /exec URL here.
 const ASSET_UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycbw_DJp0xMarEDwnQnpO0nEcQMhWygsMiBf_HGgnauh_ViU-KLmI1pG8ZI_CdNMNOi8P/exec";
 
+const savedDraft = loadLocalDraft();
+
 const state = {
-  lesson: loadLocalDraft() || createBlankLesson(),
+  lesson: savedDraft?.lesson || createBlankLesson(),
+  markupDrafts: savedDraft?.markupDrafts || [],
+  markupGeneratedFromJson: [],
+  syntaxMessages: { errors: [], warnings: [] },
   currentSection: 0,
   showAllPreview: false,
   assets: [],
@@ -93,7 +136,9 @@ function renderShell() {
           <section class="panel">
             <div class="panel__head">
               <h2 class="panel__title">섹션과 블록</h2>
-              <button class="btn btn--sm" type="button" data-action="add-section">섹션 추가</button>
+              <div class="inline-tools">
+                <button class="btn btn--sm" type="button" data-action="add-section">섹션 추가</button>
+              </div>
             </div>
             <div class="panel__body">
               <div id="section-editor"></div>
@@ -150,6 +195,11 @@ function bindRootEvents() {
     const target = event.target;
     if (target.matches("[data-upload-field]")) {
       writeUploadField(target);
+      return;
+    }
+    if (target.id === "markup-source") {
+      writeMarkupSource(target.value);
+      resizeTextarea(target);
       return;
     }
     if (target.matches("[data-path]") && !target.dataset.path.endsWith(".__commonImageInput")) {
@@ -254,13 +304,17 @@ function bindRootEvents() {
     } else if (action === "load-local") {
       const draft = loadLocalDraft();
       if (!draft) return toast("저장된 작업이 없습니다.");
-      state.lesson = draft;
+      state.lesson = draft.lesson;
+      state.markupDrafts = draft.markupDrafts || [];
+      state.markupGeneratedFromJson = [];
       state.currentSection = 0;
       renderEditor();
       refreshOutputs();
       toast("저장된 작업을 불러왔습니다.");
     } else if (action === "reset") {
       state.lesson = createBlankLesson();
+      state.markupDrafts = state.lesson.sections.map(section => stringifyLessonMarkup(section.blocks));
+      state.markupGeneratedFromJson = state.lesson.sections.map(() => false);
       state.currentSection = 0;
       renderEditor();
       refreshOutputs();
@@ -269,8 +323,17 @@ function bindRootEvents() {
       copyJson();
     } else if (action === "download-json") {
       downloadJson();
+    } else if (action === "insert-markup-asset") {
+      state.assetTarget = "__markup__";
+      openAssetSearch("multi", "media");
+    } else if (action === "insert-markup-guide") {
+      insertMarkupText(MARKUP_GUIDE_TEXT);
+      toast("문법 설명을 넣었습니다.");
     } else if (action === "add-section") {
-      state.lesson.sections.push(createSection(state.lesson.sections.length + 1));
+      const section = createSection(state.lesson.sections.length + 1);
+      state.lesson.sections.push(section);
+      state.markupDrafts.push(stringifyLessonMarkup(section.blocks));
+      state.markupGeneratedFromJson.push(false);
       state.currentSection = state.lesson.sections.length - 1;
       renderEditor();
       refreshOutputs();
@@ -283,18 +346,25 @@ function bindRootEvents() {
       clone.id = uniqueSectionId(clone.id || "section");
       clone.title = `${clone.title || "새 섹션"} 복사본`;
       state.lesson.sections.splice(sectionIdx + 1, 0, clone);
+      state.markupDrafts.splice(sectionIdx + 1, 0, getSectionMarkup(sectionIdx));
+      state.markupGeneratedFromJson.splice(sectionIdx + 1, 0, state.markupGeneratedFromJson[sectionIdx] || false);
       state.currentSection = sectionIdx + 1;
       renderEditor();
       refreshOutputs();
     } else if (action === "delete-section") {
       if (state.lesson.sections.length <= 1) return toast("섹션은 최소 1개가 필요합니다.");
       state.lesson.sections.splice(sectionIdx, 1);
+      state.markupDrafts.splice(sectionIdx, 1);
+      state.markupGeneratedFromJson.splice(sectionIdx, 1);
       state.currentSection = Math.max(0, Math.min(state.currentSection, state.lesson.sections.length - 1));
       renderEditor();
       refreshOutputs();
     } else if (action === "move-section") {
-      moveItem(state.lesson.sections, sectionIdx, Number(button.dataset.dir));
-      state.currentSection = Math.max(0, Math.min(state.lesson.sections.length - 1, sectionIdx + Number(button.dataset.dir)));
+      const dir = Number(button.dataset.dir);
+      moveItem(state.lesson.sections, sectionIdx, dir);
+      moveItem(state.markupDrafts, sectionIdx, dir);
+      moveItem(state.markupGeneratedFromJson, sectionIdx, dir);
+      state.currentSection = Math.max(0, Math.min(state.lesson.sections.length - 1, sectionIdx + dir));
       renderEditor();
       refreshOutputs();
     } else if (action === "add-block") {
@@ -389,7 +459,11 @@ function bindRootEvents() {
         toggleAssetSelection(button.dataset.key);
         return;
       }
-      if (state.assetTarget) setPath(state.assetTarget, button.dataset.key);
+      if (state.assetTarget === "__markup__") {
+        insertMarkupAssets([button.dataset.key]);
+      } else if (state.assetTarget) {
+        setPath(state.assetTarget, button.dataset.key);
+      }
       closeAssetSearch();
       renderEditor();
       refreshOutputs();
@@ -413,9 +487,27 @@ function bindRootEvents() {
 
 function renderEditor() {
   renderMetaEditor();
+  validateCurrentMarkup();
   renderSectionEditor();
   resizeTextareas();
   focusPendingField();
+}
+
+function validateCurrentMarkup() {
+  const source = getSectionMarkup(state.currentSection);
+  if (state.markupGeneratedFromJson[state.currentSection]) {
+    state.syntaxMessages = { errors: [], warnings: [] };
+    return;
+  }
+  const result = parseLessonMarkup(source);
+  state.syntaxMessages = {
+    errors: result.errors,
+    warnings: result.warnings,
+  };
+  if (!result.errors.length) {
+    const section = state.lesson.sections[state.currentSection];
+    if (section) section.blocks = result.blocks;
+  }
 }
 
 function renderMetaEditor() {
@@ -461,15 +553,83 @@ function renderSectionEditor() {
           ${inputField("section-id", "섹션 ID", `lesson.sections.${sectionIdx}.id`, "1-1")}
           ${inputField("section-title", "섹션 제목", `lesson.sections.${sectionIdx}.title`, "섹션 제목")}
         </div>
-        <div class="section-card__blocks-head">
-          <h3 class="panel__title">블록</h3>
-          ${renderBlockTypeButtons(sectionIdx)}
-        </div>
-        <div class="section-card__blocks" data-section="${sectionIdx}">
-          ${current.blocks.length ? current.blocks.map((block, idx) => renderBlockEditor(block, sectionIdx, idx, `lesson.sections.${sectionIdx}.blocks.${idx}`)).join("") : `<p class="field__hint" style="margin:1rem 0 0;">아직 블록이 없습니다. 위 버튼으로 블록을 추가하세요.</p>`}
-        </div>
+        ${renderMarkupEditor(sectionIdx)}
       </div>
     </details>
+  `;
+}
+
+function renderMarkupEditor(sectionIdx) {
+  const source = getSectionMarkup(sectionIdx);
+  const messages = state.syntaxMessages || { errors: [], warnings: [] };
+  return `
+    <div class="markup-editor">
+      <div class="markup-editor__head">
+        <h3 class="panel__title">문법 입력</h3>
+        <div class="inline-tools">
+          <button class="btn btn--sm" type="button" data-action="insert-markup-guide">문법 띄워보기</button>
+          <span class="markup-help">
+            <button class="btn btn--sm" type="button">문법 설명</button>
+            <span class="markup-help__popover" role="tooltip">
+              <span class="markup-help__row markup-help__row--head"><span>문법</span><span>기능</span></span>
+              <span class="markup-help__row"><code>[사례</code><span>사례 블록</span></span>
+              <span class="markup-help__row"><code>[개념</code><span>개념 블록</span></span>
+              <span class="markup-help__row"><code>[발문</code><span>발문 블록</span></span>
+              <span class="markup-help__row"><code>]</code><span>최근 블록 닫기</span></span>
+              <span class="markup-help__row"><code>##</code><span>장</span></span>
+              <span class="markup-help__row"><code>###</code><span>절</span></span>
+              <span class="markup-help__row"><code>-</code><span>불릿</span></span>
+              <span class="markup-help__row"><code>  -</code><span>하위 불릿</span></span>
+              <span class="markup-help__row"><code>*내용*</code><span>강조</span></span>
+              <span class="markup-help__row"><code>%내용%</code><span>힌트/출처/부연</span></span>
+              <span class="markup-help__row"><code>[[자료키]]</code><span>외부자료 호출</span></span>
+              <span class="markup-help__row"><code>[[a]] ~ [[b]]</code><span>자료 병렬 연결</span></span>
+              <span class="markup-help__row"><code>{{인용}}</code><span>인용 박스</span></span>
+              <span class="markup-help__row"><code>{{a}} ~ {{b}}</code><span>인용 병렬 연결</span></span>
+              <span class="markup-help__row"><code>---</code><span>구분선</span></span>
+              <span class="markup-help__row"><code>&lt;a&gt;...&lt;/a&gt;</code><span>답 보기</span></span>
+              <span class="markup-help__row"><code>&lt;c&gt;...&lt;/c&gt;</code><span>댓글 박스</span></span>
+              <span class="markup-help__row"><code>&lt;p&gt;...&lt;/p&gt;</code><span>기출문제</span></span>
+              <span class="markup-help__row"><code>&gt;&gt;</code><span>토글 박스</span></span>
+              <span class="markup-help__row"><code>&#96;&#96;&#96;</code><span>텍스트 박스</span></span>
+            </span>
+          </span>
+          <button class="btn btn--sm" type="button" data-action="insert-markup-asset">자료 키 넣기</button>
+        </div>
+      </div>
+      <label class="field field--full">
+        <span class="field__label">현재 섹션 블록</span>
+        <textarea id="markup-source" class="markup-source" spellcheck="false" wrap="soft">${escapeHtml(source)}</textarea>
+        <span class="field__hint">[사례, [개념, [발문은 ]로 닫고, 자료는 [[키]], 인용은 {{내용}}, 병렬 연결은 ~, 구분선은 --- 로 씁니다.</span>
+      </label>
+      <div id="markup-messages">
+        ${renderSyntaxMessages(messages)}
+      </div>
+    </div>
+  `;
+}
+
+function renderSyntaxMessages(messages) {
+  const errors = messages?.errors || [];
+  const warnings = messages?.warnings || [];
+  if (!errors.length && !warnings.length) {
+    return `<div class="markup-message markup-message--ok">문법 오류가 없습니다.</div>`;
+  }
+  return `
+    <div class="markup-message-list">
+      ${errors.map(item => renderSyntaxMessage(item, "error")).join("")}
+      ${warnings.map(item => renderSyntaxMessage(item, "warning")).join("")}
+    </div>
+  `;
+}
+
+function renderSyntaxMessage(item, kind) {
+  const label = kind === "error" ? "오류" : "주의";
+  return `
+    <div class="markup-message markup-message--${kind}">
+      <strong>${label}${item.line ? ` ${item.line}행` : ""}</strong>
+      <span>${escapeHtml(item.message || "")}</span>
+    </div>
   `;
 }
 
@@ -811,6 +971,76 @@ function writeField(target) {
   }
 }
 
+function getSectionMarkup(sectionIdx = state.currentSection) {
+  if (state.markupDrafts[sectionIdx] == null) {
+    const blocks = state.lesson.sections[sectionIdx]?.blocks || [];
+    state.markupDrafts[sectionIdx] = stringifyLessonMarkup(blocks);
+    state.markupGeneratedFromJson[sectionIdx] = true;
+  }
+  return state.markupDrafts[sectionIdx] || "";
+}
+
+function writeMarkupSource(value) {
+  const sectionIdx = state.currentSection;
+  state.markupDrafts[sectionIdx] = value;
+  state.markupGeneratedFromJson[sectionIdx] = false;
+  const result = parseLessonMarkup(value);
+  state.syntaxMessages = {
+    errors: result.errors,
+    warnings: result.warnings,
+  };
+  renderMarkupMessages();
+  if (result.errors.length) return;
+  const section = state.lesson.sections[sectionIdx];
+  if (!section) return;
+  section.blocks = result.blocks;
+  refreshOutputs();
+}
+
+function renderMarkupMessages() {
+  const target = document.getElementById("markup-messages");
+  if (target) target.innerHTML = renderSyntaxMessages(state.syntaxMessages);
+}
+
+function insertMarkupAssets(keys) {
+  const values = keys.map(key => String(key || "").trim()).filter(Boolean);
+  if (!values.length) return;
+  const snippet = values.map(key => `[[${key}]]`).join(" ~ ");
+  insertMarkupText(snippet);
+}
+
+function insertMarkupText(snippet) {
+  const textarea = document.getElementById("markup-source");
+  const sectionIdx = state.currentSection;
+  const current = getSectionMarkup(sectionIdx);
+
+  let next;
+  let cursor;
+  if (textarea && document.activeElement === textarea) {
+    const start = textarea.selectionStart ?? current.length;
+    const end = textarea.selectionEnd ?? start;
+    const before = current.slice(0, start);
+    const after = current.slice(end);
+    const prefix = before && !before.endsWith("\n") ? "\n" : "";
+    const suffix = after && !after.startsWith("\n") ? "\n" : "";
+    next = `${before}${prefix}${snippet}${suffix}${after}`;
+    cursor = before.length + prefix.length + snippet.length;
+  } else {
+    const separator = current.trim() ? "\n\n" : "";
+    next = `${current}${separator}${snippet}`;
+    cursor = next.length;
+  }
+
+  state.markupDrafts[sectionIdx] = next;
+  if (textarea) {
+    textarea.value = next;
+    textarea.focus();
+    textarea.setSelectionRange(cursor, cursor);
+    resizeTextarea(textarea);
+  }
+  writeMarkupSource(next);
+}
+
 function readDisplayValue(path) {
   if (path.endsWith(".answerText")) {
     const answer = getPath(path.replace(/\.answerText$/, ".answer"));
@@ -845,6 +1075,7 @@ function resizeTextareas() {
 }
 
 function resizeTextarea(textarea) {
+  if (textarea.classList.contains("markup-source")) return;
   textarea.style.height = "auto";
   textarea.style.height = `${textarea.scrollHeight + 2}px`;
 }
@@ -878,11 +1109,17 @@ function renderPreview() {
     `;
     main.appendChild(header);
 
+    let previousBlockType = null;
     (sec.blocks || []).forEach((block, idx) => {
       try {
         const el = renderBlock(block, idx);
-        if (el) main.appendChild(el);
-        if (sec.blocks[idx + 1] && block.type !== "소제목") main.appendChild(renderDivider());
+        if (el) {
+          if (previousBlockType && previousBlockType !== "구분선" && block.type !== "구분선") {
+            main.appendChild(renderBlockSeparator());
+          }
+          main.appendChild(el);
+          previousBlockType = block.type;
+        }
       } catch (err) {
         const div = document.createElement("div");
         div.className = "preview-error";
@@ -911,7 +1148,7 @@ function cleanLesson({ includeComments }) {
 }
 
 function cleanBlock(block, includeComments) {
-  if (["구분선", "접이식", "요약"].includes(block.type)) return null;
+  if (["접이식", "요약"].includes(block.type)) return null;
   const copy = structuredClone(block);
   if (!includeComments) stripComments(copy);
   normalizeMaterialArrays(copy);
@@ -1576,7 +1813,9 @@ function splitKeywords(value) {
 
 function insertUploadedAssetKey(key) {
   if (!state.assetTarget) return;
-  if (state.assetTarget.endsWith(".__commonImages")) {
+  if (state.assetTarget === "__markup__") {
+    insertMarkupAssets([key]);
+  } else if (state.assetTarget.endsWith(".__commonImages")) {
     appendCommonImages(state.assetTarget.replace(/\.__commonImages$/, ""), [key]);
   } else if (/\.materials$|\.items$/.test(state.assetTarget)) {
     const current = Array.isArray(getPath(state.assetTarget)) ? getPath(state.assetTarget) : [];
@@ -1777,7 +2016,9 @@ function insertUploadedAssetUrl() {
 
 function insertUploadedAssetValue(value) {
   if (!state.assetTarget) return;
-  if (state.assetTarget.endsWith(".__commonImages")) {
+  if (state.assetTarget === "__markup__") {
+    insertMarkupAssets([value]);
+  } else if (state.assetTarget.endsWith(".__commonImages")) {
     appendCommonImages(state.assetTarget.replace(/\.__commonImages$/, ""), [value]);
   } else if (/\.materials$|\.items$/.test(state.assetTarget)) {
     const current = Array.isArray(getPath(state.assetTarget)) ? getPath(state.assetTarget) : [];
@@ -1877,6 +2118,15 @@ function applyAssetSelection() {
     toast(`${count}개 키를 추가했습니다.`);
     return;
   }
+  if (state.assetTarget === "__markup__") {
+    const count = state.assetSelection.size;
+    insertMarkupAssets([...state.assetSelection]);
+    closeAssetSearch();
+    renderEditor();
+    refreshOutputs();
+    toast(`${count}개 키를 문법 입력에 추가했습니다.`);
+    return;
+  }
   const current = Array.isArray(getPath(state.assetTarget)) ? getPath(state.assetTarget) : [];
   const merged = [...current];
   const count = state.assetSelection.size;
@@ -1903,6 +2153,7 @@ function getDefaultAssetSource(path) {
 
 function getAssetTargetLabel() {
   if (!state.assetTarget) return "선택된 입력칸 없음";
+  if (state.assetTarget === "__markup__") return "현재 섹션 문법 입력";
   if (state.assetTarget.endsWith(".__commonImages")) return "공통 이미지";
   if (state.assetMode === "quiz-items") return "기출문제 여러 개";
   if (/\.items\.\d+\.image$/.test(state.assetTarget)) return "기출문제 이미지";
@@ -1944,6 +2195,7 @@ function saveLocalDraft() {
     localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({
       ts: Date.now(),
       lesson: state.lesson,
+      markupDrafts: state.markupDrafts,
     }));
   } catch (err) {
     console.warn("작업 저장 실패:", err);
@@ -1960,7 +2212,10 @@ function loadLocalDraft() {
       localStorage.removeItem(LOCAL_CACHE_KEY);
       return null;
     }
-    return normalizeLessonDraft(lesson);
+    return {
+      lesson: normalizeLessonDraft(lesson),
+      markupDrafts: Array.isArray(parsed.markupDrafts) ? parsed.markupDrafts : [],
+    };
   } catch {
     try {
       localStorage.removeItem(LOCAL_CACHE_KEY);
