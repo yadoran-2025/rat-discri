@@ -32,6 +32,7 @@ export function renderBlock(block, blockIdx) {
     구분선:    renderDivider,
     댓글:      renderCommentBlock,
     인용:      renderQuote,
+    텍스트박스: renderTextBox,
     그룹:      renderGroup,
     토글:      renderToggle,
     사례:      renderCase,
@@ -96,6 +97,16 @@ function renderQuote(block) {
   div.className = "block quote-block";
   div.innerHTML = formatInline(block.body || block.text || "");
   appendAsides(div, block.asides);
+  return div;
+}
+
+function renderTextBox(block) {
+  const div = document.createElement("div");
+  div.className = "block text-cutout";
+  const body = document.createElement("div");
+  body.className = "text-cutout__body";
+  body.innerHTML = formatInline(block.body || block.text || "");
+  div.appendChild(body);
   return div;
 }
 
@@ -217,6 +228,10 @@ function renderQuestion(block, blockIdx) {
           div.appendChild(renderFlowQuote(item));
           return;
         }
+        if (item.type === "textBox") {
+          div.appendChild(renderFlowTextBox(item));
+          return;
+        }
         if (item.type === "group") {
           div.appendChild(buildObjectGroup(item.items, item.layout || "row"));
           return;
@@ -323,6 +338,10 @@ function appendFlow(parent, flow, textClass, context = {}) {
       parent.appendChild(renderFlowQuote(item));
       return;
     }
+    if (item.type === "textBox") {
+      parent.appendChild(renderFlowTextBox(item));
+      return;
+    }
     if (item.type === "group") {
       parent.appendChild(buildObjectGroup(item.items, item.layout || "row"));
       return;
@@ -358,6 +377,12 @@ function renderFlowQuote(item) {
   return quote;
 }
 
+function renderFlowTextBox(item) {
+  const textBox = renderTextBox({ body: item.body || item.text || "" });
+  textBox.classList.remove("block");
+  return textBox;
+}
+
 function buildObjectGroup(items, layout = "row", extraClass = "") {
   const wrap = document.createElement("div");
   const normalizedLayout = normalizeLayout(layout);
@@ -376,8 +401,8 @@ function applyObjectGroupCompositionClass(wrap, layout) {
   const [first, second] = wrap.children;
   const firstIsImage = first.classList.contains("material--image");
   const secondIsImage = second.classList.contains("material--image");
-  const firstIsQuote = first.classList.contains("quote-block");
-  const secondIsQuote = second.classList.contains("quote-block");
+  const firstIsQuote = first.classList.contains("quote-block") || first.classList.contains("text-cutout");
+  const secondIsQuote = second.classList.contains("quote-block") || second.classList.contains("text-cutout");
 
   if (firstIsImage && secondIsQuote) {
     wrap.classList.add("object-group--image-quote");
@@ -395,6 +420,11 @@ function buildObjectGroupItem(item) {
     const quote = renderQuote(item);
     quote.classList.remove("block");
     return quote;
+  }
+  if (item?.type === "텍스트박스" || item?.type === "textBox") {
+    const textBox = renderTextBox(item);
+    textBox.classList.remove("block");
+    return textBox;
   }
   return renderBlock(item);
 }

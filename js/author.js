@@ -14,18 +14,21 @@ const LEGACY_BLOCK_TYPES = ["이미지곁글"];
 const LOCAL_CACHE_KEY = "lessonAuthorDraft_v2";
 const EXTERNAL_ASSETS_CACHE_KEY = "externalAssets_v2";
 const LAYOUT_OPTIONS = [["stack", "아래로 나열"], ["row", "옆으로 나열"], ["figure", "사진+인용"]];
-const TEXT_FORMAT_HINT = "`### 강조문`을 쓰면 파란 강조 글씨로, `**강조**`는 굵은 강조로 표시됩니다.";
+const TEXT_FORMAT_HINT = "`### 절`은 작은 제목으로, `*굵게*`와 `%기울임%`은 보편 문법으로 표시됩니다.";
 const MARKUP_GUIDE_TEXT = `## 장 제목
 ### 절 제목
 
 일반 문단은 그대로 씁니다.
 - 불릿
-  - 하위 불릿
-%힌트, 출처, 부연처럼 얕게 흘릴 내용%
+  - 2단 불릿
+*굵게*
+%기울임체%
 
 [사례
 사례 본문
 [[자료키]]
+[[자료키==캡션]]
+{{텍스트 박스;;둘째 줄}}
 <답>
 답 보기 내용
 </답>
@@ -33,24 +36,23 @@ const MARKUP_GUIDE_TEXT = `## 장 제목
 
 [발문
 질문 내용
-]
-
 <댓>
+]
 
 [개념
 개념 설명
+[[자료1]] ~ [[자료2]]
 ]
 
-[[자료1]] ~ [[자료2]]
-[[자료키==캡션]]
-{{인용문}} ~ {{다른 인용문}}
+[문제
+문제이미지키
+<답>
+해설 내용
+</답>
+]
 
 ---
-구분선
-
->>
-토글 박스
->>`;
+구분선`;
 // Paste the deployed Google Apps Script Web App /exec URL here.
 const ASSET_UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycbw_DJp0xMarEDwnQnpO0nEcQMhWygsMiBf_HGgnauh_ViU-KLmI1pG8ZI_CdNMNOi8P/exec";
 
@@ -571,26 +573,32 @@ function renderMarkupEditor(sectionIdx) {
             <button class="btn btn--sm" type="button">문법 설명</button>
             <span class="markup-help__popover" role="tooltip">
               <span class="markup-help__row markup-help__row--head"><span>문법</span><span>기능</span></span>
+              <span class="markup-help__group">블록</span>
               <span class="markup-help__row"><code>[사례</code><span>사례 블록</span></span>
               <span class="markup-help__row"><code>[개념</code><span>개념 블록</span></span>
               <span class="markup-help__row"><code>[발문</code><span>발문 블록</span></span>
+              <span class="markup-help__row"><code>[문제</code><span>문제 블록</span></span>
               <span class="markup-help__row"><code>]</code><span>최근 블록 닫기</span></span>
               <span class="markup-help__row"><code>##</code><span>장</span></span>
-              <span class="markup-help__row"><code>###</code><span>절</span></span>
-              <span class="markup-help__row"><code>-</code><span>불릿</span></span>
-              <span class="markup-help__row"><code>  -</code><span>하위 불릿</span></span>
-              <span class="markup-help__row"><code>*내용*</code><span>강조</span></span>
-              <span class="markup-help__row"><code>%내용%</code><span>텍스트 보조문</span></span>
+              <span class="markup-help__group">작은블록</span>
+              <span class="markup-help__row"><code>&lt;답&gt;...&lt;/답&gt;</code><span>답 보기</span></span>
+              <span class="markup-help__row"><code>&lt;댓&gt;</code><span>댓글 칸</span></span>
+              <span class="markup-help__group">객체</span>
               <span class="markup-help__row"><code>[[자료키]]</code><span>외부자료 호출</span></span>
               <span class="markup-help__row"><code>[[자료키==캡션]]</code><span>자료 캡션</span></span>
               <span class="markup-help__row"><code>[[a]] ~ [[b]]</code><span>자료 병렬 연결</span></span>
-              <span class="markup-help__row"><code>{{인용}}</code><span>인용 박스</span></span>
-              <span class="markup-help__row"><code>{{a}} ~ {{b}}</code><span>인용 병렬 연결</span></span>
+              <span class="markup-help__row"><code>{{텍스트}}</code><span>텍스트 박스</span></span>
+              <span class="markup-help__row"><code>{{a}} ~ {{b}}</code><span>텍스트 박스 병렬 연결</span></span>
+              <span class="markup-help__group">객체 내부 문법</span>
+              <span class="markup-help__row"><code>;;</code><span>객체 내부 줄바꿈</span></span>
+              <span class="markup-help__row"><code>==</code><span>자료 캡션 구분자</span></span>
+              <span class="markup-help__group">보편 문법</span>
+              <span class="markup-help__row"><code>###</code><span>절</span></span>
+              <span class="markup-help__row"><code>*내용*</code><span>굵게</span></span>
+              <span class="markup-help__row"><code>%내용%</code><span>기울임체</span></span>
+              <span class="markup-help__row"><code>-</code><span>불릿</span></span>
+              <span class="markup-help__row"><code>  -</code><span>하위 불릿</span></span>
               <span class="markup-help__row"><code>---</code><span>구분선</span></span>
-              <span class="markup-help__row"><code>&lt;답&gt;...&lt;/답&gt;</code><span>답 보기</span></span>
-              <span class="markup-help__row"><code>&lt;댓&gt;</code><span>댓글 칸</span></span>
-              <span class="markup-help__row"><code>&lt;문&gt;...&lt;/문&gt;</code><span>기출문제</span></span>
-              <span class="markup-help__row"><code>&gt;&gt;</code><span>토글 박스</span></span>
             </span>
           </span>
           <button class="btn btn--sm" type="button" data-action="insert-markup-asset">자료 키 넣기</button>
@@ -599,7 +607,7 @@ function renderMarkupEditor(sectionIdx) {
       <label class="field field--full">
         <span class="field__label">현재 섹션 블록</span>
         <textarea id="markup-source" class="markup-source" spellcheck="false" wrap="soft">${escapeHtml(source)}</textarea>
-        <span class="field__hint">[사례, [개념, [발문은 ]로 닫고, 자료는 [[키]], 인용은 {{내용}}, 댓글 칸은 &lt;댓&gt;, 병렬 연결은 ~, 구분선은 --- 로 씁니다.</span>
+        <span class="field__hint">[사례, [개념, [발문, [문제는 ]로 닫고, 자료는 [[키]], 텍스트 박스는 {{내용}}, 댓글 칸은 &lt;댓&gt;, 병렬 연결은 ~, 구분선은 --- 로 씁니다.</span>
       </label>
       <div id="markup-messages">
         ${renderSyntaxMessages(messages)}

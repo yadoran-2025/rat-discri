@@ -82,8 +82,8 @@ export function formatInline(text) {
 
   const lines = text.replace(/\t/g, "  ").split("\n");
   const inline = s => escapeHtml(s)
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/(^|[^\*])\*([^\*\n]+?)\*(?!\*)/g, "$1<strong>$2</strong>");
+    .replace(/(^|[^\*])\*([^\*\n]+?)\*(?!\*)/g, "$1<strong>$2</strong>")
+    .replace(/%([^%\n]+?)%/g, "<em>$1</em>");
 
   let out = "";
   let inUl = false;

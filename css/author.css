@@ -230,8 +230,9 @@ select {
   right: 0;
   z-index: 30;
   display: none;
-  width: min(22rem, 80vw);
-  overflow: hidden;
+  width: min(28rem, 86vw);
+  max-height: min(72vh, 34rem);
+  overflow: auto;
   border: 1px solid #cfd8e6;
   border-radius: 8px;
   background: #fff;
@@ -261,6 +262,20 @@ select {
   background: #f8fafc;
   color: #475569;
   font-weight: 800;
+}
+
+.markup-help__group {
+  display: block;
+  padding: 0.42rem 0.65rem;
+  border-top: 1px solid #dbe5f2;
+  background: #eef4ff;
+  color: #0f4fcc;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.markup-help__row--head + .markup-help__group {
+  border-top: none;
 }
 
 .markup-help code {
