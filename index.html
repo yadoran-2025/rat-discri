@@ -19,39 +19,7 @@
 </head>
 
 <body>
-  <div class="app">
-    <!-- 왼쪽 사이드바 -->
-    <aside class="sidebar">
-      <div class="sidebar__group" id="sidebar-group"></div>
-      <h1 class="sidebar__title" id="sidebar-title"></h1>
-      <div class="sidebar__subtitle" id="sidebar-subtitle"></div>
-
-      <nav id="sidebar-sections"></nav>
-
-      <div class="sidebar__lesson-links" id="sidebar-lesson-links"></div>
-
-      <div class="sidebar__hotkeys">
-
-        <div><kbd>&larr;</kbd> <kbd>&rarr;</kbd> 섹션 이동</div>
-        <div><kbd>Space</kbd> 답 열기/닫기</div>
-        <div><kbd>Click</kbd> 목차 점프</div>
-      </div>
-
-    </aside>
-
-    <!-- 메인 콘텐츠 -->
-    <main class="main">
-      <div class="main__inner">
-        <div id="main-content"></div>
-
-        <div class="nav-footer">
-          <button id="nav-prev">&larr; 이전 섹션</button>
-          <div class="nav-footer__progress" id="nav-progress"></div>
-          <button id="nav-next">다음 섹션 &rarr;</button>
-        </div>
-      </div>
-    </main>
-  </div>
+  <div id="app-root"></div>
 
   <script type="module" src="js/app.js?v=2"></script>
 </body>

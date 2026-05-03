@@ -9,7 +9,7 @@
     <link rel="stylesheet" crossorigin
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
     <link rel="stylesheet" href="https://yadoran-2025.github.io/booong-design-system/releases/v2.0.0/booong.css">
-    <link rel="stylesheet" href="css/select.css?v=toc-sidebar-1">
+    <link rel="stylesheet" href="css/select.css?v=select-ux-1">
 </head>
 <body>
     <aside class="sel-sidebar" aria-label="문제 목차">
@@ -24,23 +24,27 @@
     <div class="sel-wrap">
         <header class="sel-header">
             <a class="back-btn" href="index.html">← 대시보드</a>
-            <div class="sel-header__accent"></div>
-            <h1 class="sel-header__title">인쇄할 문제 선택</h1>
-            <p class="sel-header__sub">목록에서 원하는 문제를 선택한 뒤 하단 버튼을 누르세요.</p>
+            <h1 class="sel-header__title">문제 선택</h1>
         </header>
 
         <div class="sel-toolbar">
-            <input type="text" id="search" class="sel-search" placeholder="문제 번호로 검색…" autocomplete="off">
+            <div class="sel-search-wrap">
+                <svg class="sel-search-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <circle cx="7" cy="7" r="4.5"></circle>
+                    <path d="M10.5 10.5l3 3"></path>
+                </svg>
+                <input type="text" id="search" class="sel-search" placeholder="문제 번호로 검색…" autocomplete="off">
+            </div>
             <div class="sel-toolbar__btns">
                 <button class="sel-btn-minor" id="btn-select-all">전체 선택</button>
                 <button class="sel-btn-minor" id="btn-deselect-all">전체 해제</button>
             </div>
         </div>
 
-        <div class="sel-meta">
-            <label class="sel-meta__label" for="header-input">인쇄물 헤더 (선택)</label>
-            <input type="text" id="header-input" class="sel-text-input"
-                placeholder="예: 2026학년도 잠원고등학교 정치와 법 연습문제">
+        <div class="sel-selection" id="sel-selection" hidden>
+            <span class="sel-selection__count" id="sel-chip-count">0개 선택됨</span>
+            <div class="sel-selection__chips" id="sel-chips"></div>
+            <button class="sel-selection__clear" id="btn-clear-selected" type="button">전체 해제</button>
         </div>
 
         <div id="key-list" class="sel-list">
@@ -49,19 +53,26 @@
     </div>
 
     <div class="sel-bar">
-        <span class="sel-bar__count" id="sel-count">0개 선택됨</span>
-        <button class="sel-bar__btn" id="btn-print" disabled>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                <rect x="6" y="14" width="12" height="8"></rect>
-            </svg>
-            인쇄하기
-        </button>
+        <div class="sel-bar__main">
+            <span class="sel-bar__count" id="sel-count"><strong>0개</strong> 선택됨</span>
+            <button class="sel-bar__btn" id="btn-print" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                인쇄하기
+            </button>
+        </div>
+        <div class="sel-bar__setup">
+            <label class="sel-bar__setup-label" for="header-input">인쇄물 헤더</label>
+            <input type="text" id="header-input" class="sel-text-input"
+                placeholder="예: 2026학년도 잠원고등학교 정치와 법 연습문제 (선택)">
+        </div>
     </div>
 
     <script type="module" src="js/visitor-tracker.js"></script>
-    <script src="js/select.js?v=toc-sidebar-1"></script>
+    <script src="js/select.js?v=select-ux-1"></script>
 </body>
 </html>

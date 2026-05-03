@@ -27,16 +27,13 @@ export async function trackPage(page) {
   const visitorRef = ref(db, `${ANALYTICS_ROOT}/pageVisitors/${normalized.key}/${visitorId}`);
 
   try {
-    await Promise.all([
-      runTransaction(ref(db, `${ANALYTICS_ROOT}/pages/${normalized.key}/views`), value => (Number(value) || 0) + 1),
-      update(pageRef, {
-        key: normalized.key,
-        title: normalized.title,
-        path: normalized.path,
-        type: normalized.type,
-        updatedAt: serverTimestamp(),
-      }),
-    ]);
+    await update(pageRef, {
+      key: normalized.key,
+      title: normalized.title,
+      path: normalized.path,
+      type: normalized.type,
+      updatedAt: serverTimestamp(),
+    });
 
     const existingVisitor = await get(visitorRef);
     if (!existingVisitor.exists()) {
@@ -45,6 +42,56 @@ export async function trackPage(page) {
     }
   } catch (err) {
     console.warn("Visitor analytics update failed:", err);
+  }
+
+  return normalized;
+}
+
+export async function trackGroupClick(group) {
+  const normalized = normalizeGroupClick(group);
+  if (!normalized.groupId) return null;
+
+  const visitorId = getVisitorId();
+  const groupRef = ref(db, `${ANALYTICS_ROOT}/groupClicks/${normalized.groupId}`);
+  const visitorRef = ref(db, `${ANALYTICS_ROOT}/groupClickVisitors/${normalized.groupId}/${visitorId}`);
+
+  try {
+    await Promise.all([
+      runTransaction(ref(db, `${ANALYTICS_ROOT}/groupClicks/${normalized.groupId}/totalClicks`), value => (Number(value) || 0) + 1),
+      update(groupRef, {
+        groupId: normalized.groupId,
+        title: normalized.title,
+        type: normalized.type,
+        lastHref: normalized.href,
+        lastActionKey: normalized.actionKey,
+        updatedAt: serverTimestamp(),
+      }),
+    ]);
+
+    const existingVisitor = await get(visitorRef);
+    if (existingVisitor.exists()) {
+      await Promise.all([
+        runTransaction(ref(db, `${ANALYTICS_ROOT}/groupClickVisitors/${normalized.groupId}/${visitorId}/count`), value => (Number(value) || 0) + 1),
+        update(visitorRef, {
+          lastClickedAt: serverTimestamp(),
+          lastActionKey: normalized.actionKey,
+          lastHref: normalized.href,
+        }),
+      ]);
+    } else {
+      await Promise.all([
+        set(visitorRef, {
+          count: 1,
+          firstClickedAt: serverTimestamp(),
+          lastClickedAt: serverTimestamp(),
+          lastActionKey: normalized.actionKey,
+          lastHref: normalized.href,
+        }),
+        runTransaction(ref(db, `${ANALYTICS_ROOT}/groupClicks/${normalized.groupId}/visitorCount`), value => (Number(value) || 0) + 1),
+      ]);
+    }
+  } catch (err) {
+    console.warn("Group click analytics update failed:", err);
   }
 
   return normalized;
@@ -68,6 +115,28 @@ export async function loadPageVisitStats() {
       .sort((a, b) => b.visitors - a.visitors || b.views - a.views || a.title.localeCompare(b.title, "ko"));
   } catch (err) {
     console.warn("Visitor analytics load failed:", err);
+    return [];
+  }
+}
+
+export async function loadGroupClickStats() {
+  try {
+    const snapshot = await get(ref(db, `${ANALYTICS_ROOT}/groupClicks`));
+    const value = snapshot.val() || {};
+    return Object.values(value)
+      .filter(item => item && item.groupId)
+      .map(item => ({
+        groupId: item.groupId,
+        title: item.title || item.groupId,
+        type: item.type || "group",
+        totalClicks: Number(item.totalClicks) || 0,
+        visitorCount: Number(item.visitorCount) || 0,
+        lastHref: item.lastHref || "",
+        updatedAt: item.updatedAt || 0,
+      }))
+      .sort((a, b) => b.totalClicks - a.totalClicks || b.visitorCount - a.visitorCount || a.title.localeCompare(b.title, "ko"));
+  } catch (err) {
+    console.warn("Group click analytics load failed:", err);
     return [];
   }
 }
@@ -102,6 +171,16 @@ function normalizePage(page = {}) {
     title: String(page.title || page.key || "").trim(),
     path: String(page.path || "").trim(),
     type: String(page.type || "page").trim(),
+  };
+}
+
+function normalizeGroupClick(group = {}) {
+  return {
+    groupId: slugify(group.groupId || group.id).slice(0, 96),
+    title: String(group.title || group.groupId || group.id || "").trim(),
+    type: String(group.type || "group").trim(),
+    href: String(group.href || "").trim(),
+    actionKey: String(group.actionKey || "").trim(),
   };
 }
 

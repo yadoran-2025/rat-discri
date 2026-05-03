@@ -1,6 +1,6 @@
-import { loadDashboardConfig as loadSharedDashboardConfig } from "../dashboard-data.js";
+import { loadCachedDashboardConfig, loadDashboardConfig as loadSharedDashboardConfig, loadLocalDashboardConfig } from "../dashboard-data.js";
 import { escapeHtml } from "../utils.js";
-import { loadPageVisitStats } from "../visitor-analytics.js";
+import { loadGroupClickStats, loadPageVisitStats, trackGroupClick } from "../visitor-analytics.js";
 
 const SUBJECT_COLOR_PALETTE = [
   "#639922",
@@ -35,11 +35,29 @@ const TOOL_LABELS = {
   "lesson-author": "BNG LANG 에디터",
 };
 
+const SIDEBAR_TOOL_GROUPS = [
+  {
+    label: "제작",
+    items: [
+      { id: "worksheet-maker", icon: "pencil" },
+      { id: "print-mode", icon: "plus-square" },
+      { id: "lesson-author", icon: "file" },
+    ],
+  },
+  {
+    label: "참고",
+    items: [
+      { id: "asset-search", icon: "search" },
+      { id: "block-guide", icon: "bookmark" },
+    ],
+  },
+];
+
 export async function showDashboard() {
   document.body.innerHTML = "";
   document.body.style.background = "";
 
-  const config = await loadDashboardConfig();
+  const config = loadCachedDashboardConfig() || await loadLocalDashboardConfig();
   const state = {
     section: "all",
     kind: "",
@@ -47,6 +65,8 @@ export async function showDashboard() {
     subject: "",
     query: "",
     viewMode: "list",
+    sortMode: "default",
+    clickStats: [],
   };
 
   const container = document.createElement("div");
@@ -54,6 +74,7 @@ export async function showDashboard() {
   document.body.appendChild(container);
 
   renderDashboard(container, config, state);
+  refreshDashboardConfig(container, config, state);
 }
 
 export async function loadDashboardConfig() {
@@ -70,7 +91,6 @@ function renderDashboard(root, config, state) {
       ${renderSidebar(config, items, state)}
       <main class="dashboard-main">
         ${renderMainHeader(config)}
-        ${renderVisitStatsShell()}
         ${renderSearchAndFilters(items, filteredItems, state)}
         ${renderResults(filteredItems, state)}
       </main>
@@ -78,64 +98,75 @@ function renderDashboard(root, config, state) {
   `;
 
   bindDashboardEvents(root, config, state);
-  hydrateVisitStats(root);
+  hydrateVisitStats(root, state);
+}
+
+async function refreshDashboardConfig(root, currentConfig, state) {
+  try {
+    const nextConfig = await loadDashboardConfig({ cache: false });
+    if (!root.isConnected || isSameDashboardConfig(currentConfig, nextConfig)) return;
+    renderDashboard(root, nextConfig, state);
+  } catch (err) {
+    console.warn("Dashboard refresh failed:", err);
+  }
 }
 
 function renderVisitStatsShell() {
   return `
-    <section class="dashboard-visit-stats" aria-label="페이지별 방문자 수" data-visit-stats>
-      <div class="dashboard-visit-stats__head">
-        <span>페이지별 방문자 수</span>
+    <details class="dashboard-visit-stats" data-visit-stats>
+      <summary class="dashboard-visit-stats__head">
+        <span>대시보드 방문 인원</span>
         <span>불러오는 중</span>
-      </div>
-    </section>
+      </summary>
+    </details>
   `;
 }
 
-async function hydrateVisitStats(root) {
+async function hydrateVisitStats(root, state) {
   const target = root.querySelector("[data-visit-stats]");
   if (!target) return;
 
-  const stats = await loadPageVisitStats();
+  const [pageStats, clickStats] = await Promise.all([
+    loadPageVisitStats(),
+    loadGroupClickStats(),
+  ]);
   if (!root.contains(target)) return;
+  state.clickStats = clickStats;
 
-  if (!stats.length) {
-    target.innerHTML = `
-      <div class="dashboard-visit-stats__head">
-        <span>페이지별 방문자 수</span>
-        <span>집계 대기</span>
-      </div>
-      <p class="dashboard-visit-stats__empty">방문 기록이 쌓이면 여기에 페이지별 방문자 수가 표시됩니다.</p>
-    `;
-    return;
-  }
-
-  const totalVisitors = stats.reduce((sum, item) => sum + item.visitors, 0);
-  const totalViews = stats.reduce((sum, item) => sum + item.views, 0);
+  const dashboardStats = pageStats.find(item => item.key === "dashboard");
+  const dashboardVisitors = dashboardStats?.visitors || 0;
   target.innerHTML = `
-    <div class="dashboard-visit-stats__head">
-      <span>페이지별 방문자 수</span>
-      <span>${escapeHtml(formatNumber(totalVisitors))}명 · ${escapeHtml(formatNumber(totalViews))}회</span>
-    </div>
-    <div class="dashboard-visit-stats__list">
-      ${stats.slice(0, 8).map(renderVisitStatRow).join("")}
-    </div>
+    <summary class="dashboard-visit-stats__head">
+      <span>대시보드 방문 인원</span>
+      <span>${escapeHtml(formatNumber(dashboardVisitors))}명</span>
+    </summary>
+    ${clickStats.length ? `
+      <div class="dashboard-visit-stats__subhead">
+        <span>수업 그룹 클릭</span>
+        <span>고유 인원 · 클릭 수</span>
+      </div>
+      <div class="dashboard-visit-stats__list">
+        ${clickStats.slice(0, 8).map(renderGroupClickStatRow).join("")}
+      </div>
+    ` : `
+      <p class="dashboard-visit-stats__empty">수업 링크 클릭 기록이 쌓이면 여기에 그룹별 클릭 수가 표시됩니다.</p>
+    `}
   `;
 }
 
-function renderVisitStatRow(item) {
+function renderGroupClickStatRow(item) {
   return `
     <div class="dashboard-visit-stats__row">
       <span class="dashboard-visit-stats__title">${escapeHtml(item.title)}</span>
-      <span class="dashboard-visit-stats__meta">${escapeHtml(item.path || item.key)}</span>
-      <span class="dashboard-visit-stats__count">${escapeHtml(formatNumber(item.visitors))}명</span>
-      <span class="dashboard-visit-stats__views">${escapeHtml(formatNumber(item.views))}회</span>
+      <span class="dashboard-visit-stats__meta">${escapeHtml(formatNumber(item.visitorCount))}명</span>
+      <span class="dashboard-visit-stats__count">${escapeHtml(formatNumber(item.totalClicks))}회</span>
     </div>
   `;
 }
 
 function renderSidebar(config, items, state) {
   const tools = Array.isArray(config.tools) ? config.tools : [];
+  const toolsById = new Map(tools.filter(tool => tool?.id).map(tool => [tool.id, tool]));
   const lessonCount = items.filter(item => item.kind === "lesson-group").length;
   const gameCount = items.filter(item => item.kind === "game").length;
   const recentCount = getRecentItems(items).length;
@@ -154,21 +185,20 @@ function renderSidebar(config, items, state) {
 
       <nav class="dashboard-nav" aria-label="탐색">
         <span class="dashboard-nav__label">탐색</span>
-        ${renderNavButton({ section: "all", label: "모든 수업", count: items.length, state })}
-        ${renderNavButton({ section: "lesson", label: "수업", count: lessonCount, state })}
-        ${renderNavButton({ section: "game", label: "게임", count: gameCount, state })}
-        ${renderNavButton({ section: "recent", label: "최근 본 항목", count: recentCount || "", state })}
+        ${renderNavButton({ section: "all", label: "모든 수업", count: items.length, icon: "grid", state })}
+        ${renderNavButton({ section: "lesson", label: "수업", count: lessonCount, icon: "list", state })}
+        ${renderNavButton({ section: "game", label: "게임", count: gameCount, icon: "play", state })}
+        ${renderNavButton({ section: "recent", label: "최근 본 항목", count: recentCount || "", icon: "clock", state })}
       </nav>
 
-      <nav class="dashboard-nav" aria-label="도구">
-        <span class="dashboard-nav__label">도구</span>
-        ${tools.map(renderToolLink).join("")}
-      </nav>
+      <a class="dashboard-sidebar__create" href="author.html">
+        ${renderSidebarIcon("plus")}
+        <span>새 수업 만들기</span>
+      </a>
 
-      <div class="dashboard-sidebar__footer">
-        <span class="dashboard-sidebar__footer-label">새 수업 등록</span>
-        <a href="author.html">+ 자료 추가하기</a>
-      </div>
+      ${SIDEBAR_TOOL_GROUPS.map(group => renderToolSection(group, toolsById)).join("")}
+      ${renderVisitStatsShell()}
+      ${renderSidebarFooterLink()}
     </aside>
   `;
 }
@@ -184,7 +214,7 @@ function renderScooterPictogram() {
   `;
 }
 
-function renderNavButton({ section, label, count, state }) {
+function renderNavButton({ section, label, count, icon, state }) {
   const selected = state.section === section;
   return `
     <button
@@ -193,19 +223,107 @@ function renderNavButton({ section, label, count, state }) {
       data-section="${escapeAttr(section)}"
       aria-pressed="${selected ? "true" : "false"}"
     >
-      <span>${escapeHtml(label)}</span>
+      <span class="dashboard-nav__item-main">
+        ${renderSidebarIcon(icon)}
+        <span>${escapeHtml(label)}</span>
+      </span>
       ${count !== "" ? `<span class="dashboard-nav__count">${escapeHtml(count)}</span>` : ""}
     </button>
   `;
 }
 
-function renderToolLink(tool) {
+function renderToolSection(group, toolsById) {
+  const links = group.items
+    .map(item => {
+      const tool = toolsById.get(item.id);
+      return tool ? renderToolLink(tool, item.icon) : "";
+    })
+    .filter(Boolean)
+    .join("");
+
+  if (!links) return "";
+
+  return `
+    <nav class="dashboard-nav dashboard-nav--tools" aria-label="${escapeAttr(group.label)}">
+      <span class="dashboard-nav__label">${escapeHtml(group.label)}</span>
+      ${links}
+    </nav>
+  `;
+}
+
+function renderToolLink(tool, icon) {
   const label = TOOL_LABELS[tool.id] || tool.title || "도구";
   const href = tool.link || "#";
   return `
     <a class="dashboard-nav__item dashboard-nav__link" href="${escapeAttr(href)}">
-      <span>${escapeHtml(label)}</span>
+      <span class="dashboard-nav__item-main">
+        ${renderSidebarIcon(icon)}
+        <span>${escapeHtml(label)}</span>
+      </span>
     </a>
+  `;
+}
+
+function renderSidebarFooterLink() {
+  return `
+    <a class="dashboard-sidebar__footer-link" href="https://yadoran-2025.github.io/booong-design-system/" target="_blank" rel="noopener">
+      <span>디자인 시스템</span>
+      <span aria-hidden="true">→</span>
+    </a>
+  `;
+}
+
+function renderSidebarIcon(name) {
+  const paths = {
+    grid: `
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    `,
+    list: `
+      <path d="M8 6h13" />
+      <path d="M8 12h13" />
+      <path d="M8 18h13" />
+      <path d="M3 6h.01" />
+      <path d="M3 12h.01" />
+      <path d="M3 18h.01" />
+    `,
+    play: `<path d="M7 5v14l12-7-12-7Z" />`,
+    clock: `
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    `,
+    pencil: `
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="M13.5 7.5l3 3" />
+    `,
+    "plus-square": `
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="M12 8v8" />
+      <path d="M8 12h8" />
+    `,
+    file: `
+      <path d="M7 3h7l4 4v14H7z" />
+      <path d="M14 3v5h5" />
+    `,
+    search: `
+      <circle cx="11" cy="11" r="6" />
+      <path d="M16 16l4 4" />
+    `,
+    bookmark: `
+      <path d="M6 4h12v17l-6-4-6 4z" />
+    `,
+    plus: `
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    `,
+  };
+
+  return `
+    <svg class="dashboard-sidebar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      ${paths[name] || paths.grid}
+    </svg>
   `;
 }
 
@@ -216,14 +334,18 @@ function renderMainHeader(config) {
 
   return `
     <header class="dashboard-main__header">
-      <div class="dashboard-quote">
+      <a class="dashboard-quote" href="about.html">
         <p>${formatDashboardText(dashboard.subtitle || "스마트 수업 프리젠터")}</p>
-        ${dashboard.source ? `<span>${escapeHtml(dashboard.source)}</span>` : ""}
-      </div>
-      <div class="dashboard-header-actions">
-        <a class="btn btn--secondary btn--sm" href="https://yadoran-2025.github.io/booong-design-system/" target="_blank" rel="noopener">디자인 시스템</a>
-        <a class="btn btn--secondary btn--sm" href="about.html">소개</a>
-      </div>
+        <span class="dashboard-quote__meta">
+          <span class="dashboard-quote__more">
+            about us
+            <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+              <path d="M2 7h10M8 3l4 4-4 4" />
+            </svg>
+          </span>
+          ${dashboard.source ? `<span class="dashboard-quote__source">${escapeHtml(dashboard.source)}</span>` : ""}
+        </span>
+      </a>
       ${notice ? `
         <a class="dashboard-notice" href="${escapeAttr(notice.link || "#")}" ${notice.link ? "" : "aria-disabled=\"true\""}>
           <span class="dashboard-notice__tag">공지</span>
@@ -266,24 +388,49 @@ function renderSearchAndFilters(items, filteredItems, state) {
 
       <div class="dashboard-results-head">
         <span>${escapeHtml(getResultLabel(state, filteredItems.length))}</span>
-        <div class="dashboard-view-toggle" role="group" aria-label="보기 방식">
-          <button class="${state.viewMode === "list" ? "is-active" : ""}" type="button" data-view-mode="list">리스트</button>
-          <button class="${state.viewMode === "card" ? "is-active" : ""}" type="button" data-view-mode="card">카드</button>
+        <div class="dashboard-results-actions">
+          <div class="dashboard-sort-toggle" role="group" aria-label="정렬">
+            ${renderSortButton({ mode: "default", label: "기본", state })}
+            ${renderSortButton({ mode: "popular", label: "인기순", state })}
+            ${renderSortButton({ mode: "date", label: "날짜순", state })}
+          </div>
+          <div class="dashboard-view-toggle" role="group" aria-label="보기 방식">
+            <button class="${state.viewMode === "list" ? "is-active" : ""}" type="button" data-view-mode="list">리스트</button>
+            <button class="${state.viewMode === "card" ? "is-active" : ""}" type="button" data-view-mode="card">카드</button>
+          </div>
         </div>
       </div>
     </section>
   `;
 }
 
+function renderSortButton({ mode, label, state }) {
+  const selected = state.sortMode === mode;
+  return `
+    <button
+      class="${selected ? "is-active" : ""}"
+      type="button"
+      data-sort-mode="${escapeAttr(mode)}"
+      aria-pressed="${selected ? "true" : "false"}"
+    >${escapeHtml(label)}</button>
+  `;
+}
+
 function renderFilterGroup({ label, key, values, selected, allLabel, labelForValue = value => value }) {
   const buttons = [
-    renderFilterButton({ key, value: "", label: allLabel, selected: !selected }),
-    ...values.map(value => renderFilterButton({
-      key,
-      value,
-      label: labelForValue(value),
-      selected: value === selected,
-    })),
+    `${renderFilterButton({ key, value: "", label: allLabel, selected: !selected })}${key === "subject" ? `<span class="dashboard-filterbar__separator" aria-hidden="true"></span>` : ""}`,
+    ...values.map(value => {
+      const button = renderFilterButton({
+        key,
+        value,
+        label: labelForValue(value),
+        selected: value === selected,
+      });
+      if (key === "subject" && value === "사회2") {
+        return `${button}<span class="dashboard-filterbar__separator" aria-hidden="true"></span>`;
+      }
+      return button;
+    }),
   ].join("");
 
   return `
@@ -412,7 +559,14 @@ function renderLessonAction(action) {
   ].filter(Boolean).join(" ");
   const attrs = action.disabled
     ? `aria-disabled="true"`
-    : `href="${escapeAttr(action.href)}" ${action.external ? `target="_blank" rel="noopener"` : ""} data-action-key="${escapeAttr(action.key)}"`;
+    : [
+        `href="${escapeAttr(action.href)}"`,
+        action.external ? `target="_blank" rel="noopener"` : "",
+        `data-action-key="${escapeAttr(action.key)}"`,
+        `data-group-id="${escapeAttr(action.groupId)}"`,
+        `data-group-title="${escapeAttr(action.groupTitle)}"`,
+        `data-group-type="${escapeAttr(action.groupType)}"`,
+      ].filter(Boolean).join(" ");
   const tag = action.disabled ? "span" : "a";
   return `
     <${tag} class="${classes}" ${attrs}>
@@ -450,6 +604,13 @@ function bindDashboardEvents(root, config, state) {
     });
   });
 
+  root.querySelectorAll("[data-sort-mode]").forEach(button => {
+    button.addEventListener("click", () => {
+      state.sortMode = normalizeSortMode(button.dataset.sortMode);
+      renderDashboard(root, config, state);
+    });
+  });
+
   const queryInput = root.querySelector("[data-query-input]");
   if (queryInput) {
     queryInput.addEventListener("input", event => {
@@ -465,9 +626,29 @@ function bindDashboardEvents(root, config, state) {
   }
 
   root.querySelectorAll("[data-action-key]").forEach(link => {
-    link.addEventListener("click", () => {
+    link.addEventListener("click", event => {
       saveRecentKey(link.dataset.actionKey || "");
+      trackDashboardActionClick(event, link);
     });
+  });
+}
+
+function trackDashboardActionClick(event, link) {
+  const href = link.getAttribute("href") || "";
+  const tracking = trackGroupClick({
+    groupId: link.dataset.groupId || "",
+    title: link.dataset.groupTitle || "",
+    type: link.dataset.groupType || "",
+    href,
+    actionKey: link.dataset.actionKey || "",
+  });
+
+  const opensInNewContext = link.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0;
+  if (opensInNewContext || !href) return;
+
+  event.preventDefault();
+  Promise.race([tracking, wait(500)]).finally(() => {
+    window.location.href = href;
   });
 }
 
@@ -481,7 +662,7 @@ function createLibraryItems(config) {
     .filter(game => game.id && !knownGroupIds.has(game.id))
     .forEach((game, index) => items.push(createGameItem(game, groups.length + index)));
 
-  return items;
+  return items.map((item, sortIndex) => ({ ...item, sortIndex }));
 }
 
 function createGroupItem(group, index = 0) {
@@ -510,7 +691,7 @@ function createGroupItem(group, index = 0) {
     color: getSubjectColor(discipline, index),
     actions,
     lessonCount: lessons.length,
-    meta: [zeroSession.href ? "지도안" : ""].filter(Boolean),
+    meta: [],
     searchText: buildSearchText([
       group.title,
       group.desc,
@@ -530,6 +711,9 @@ function createGameItem(game, index = 0) {
   const actions = [
     {
       key: `game:${game.id || index}:open`,
+      groupId: game.id || `game-${index}`,
+      groupTitle: game.title || "게임",
+      groupType: "game",
       label: game.tag || "게임",
       title: "게임 열기",
       href,
@@ -542,6 +726,9 @@ function createGameItem(game, index = 0) {
   if (worksheetHref) {
     actions.push({
       key: `game:${game.id || index}:worksheet`,
+      groupId: game.id || `game-${index}`,
+      groupTitle: game.title || "게임",
+      groupType: "game",
       label: "학습지",
       title: "학습지 열기",
       href: worksheetHref,
@@ -573,6 +760,9 @@ function createLessonAction(lesson, group, index, isZeroSession) {
   const label = lesson.label || (isZeroSession ? "0차시" : `${index}차시`);
   return {
     key: `lesson:${group.id || "group"}:${lesson.id || label}:${index}`,
+    groupId: group.id || "group",
+    groupTitle: group.title || "수업",
+    groupType: normalizeKind(group.kind) === "game" ? "game" : "lesson-group",
     label,
     title: lesson.title || "수업 열기",
     desc: lesson.desc || "",
@@ -593,11 +783,55 @@ function normalizeState(items, state) {
 
 function getFilteredItems(items, state) {
   const query = normalizeSearchQuery(state.query);
-  return getSectionItems(items, state.section).filter(item => {
+  const filtered = getSectionItems(items, state.section).filter(item => {
     if (state.subject && item.subject !== state.subject) return false;
     if (query && !item.searchText.includes(query)) return false;
     return true;
   });
+  return sortItems(filtered, state);
+}
+
+function sortItems(items, state) {
+  const mode = normalizeSortMode(state.sortMode);
+  if (mode === "popular") {
+    const statsByGroupId = createClickStatsByGroupId(state.clickStats);
+    return [...items].sort((a, b) => {
+      const aStats = statsByGroupId.get(a.groupId) || {};
+      const bStats = statsByGroupId.get(b.groupId) || {};
+      const visitorDiff = (Number(bStats.visitorCount) || 0) - (Number(aStats.visitorCount) || 0);
+      if (visitorDiff) return visitorDiff;
+      const clickDiff = (Number(bStats.totalClicks) || 0) - (Number(aStats.totalClicks) || 0);
+      if (clickDiff) return clickDiff;
+      return a.sortIndex - b.sortIndex;
+    });
+  }
+
+  if (mode === "date") {
+    const statsByGroupId = createClickStatsByGroupId(state.clickStats);
+    return [...items].sort((a, b) => {
+      const dateDiff = (Number(statsByGroupId.get(b.groupId)?.updatedAt) || 0) - (Number(statsByGroupId.get(a.groupId)?.updatedAt) || 0);
+      if (dateDiff) return dateDiff;
+      return a.sortIndex - b.sortIndex;
+    });
+  }
+
+  return [...items].sort((a, b) => a.sortIndex - b.sortIndex);
+}
+
+function createClickStatsByGroupId(stats = []) {
+  return new Map(stats.map(item => [item.groupId, item]));
+}
+
+function normalizeSortMode(mode) {
+  return ["default", "popular", "date"].includes(mode) ? mode : "default";
+}
+
+function isSameDashboardConfig(a, b) {
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
 }
 
 function getSectionItems(items, section) {
@@ -783,4 +1017,8 @@ function saveRecentKey(key) {
     const next = [key, ...getRecentKeys().filter(value => value !== key)].slice(0, MAX_RECENT_ITEMS);
     localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next));
   } catch {}
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

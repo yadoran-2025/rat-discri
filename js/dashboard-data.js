@@ -13,14 +13,7 @@ export async function loadDashboardConfig(options = {}) {
   const cached = useCache ? loadCachedDashboardConfig() : null;
   if (cached) return cached;
 
-  let config = { dashboard: {}, groups: [], games: [], tools: [], notices: [] };
-
-  try {
-    const res = await fetch(`lessons/index.json?_=${Date.now()}`, { cache: "no-store" });
-    if (res.ok) config = await res.json();
-  } catch (err) {
-    console.error("Dashboard config load failed:", err);
-  }
+  let config = await loadLocalDashboardConfig();
 
   try {
     const sheetGroups = await loadSheetLessonGroups();
@@ -38,6 +31,19 @@ export async function loadDashboardConfig(options = {}) {
   const normalized = normalizeDashboardConfig(config);
   if (useCache) saveCachedDashboardConfig(normalized);
   return normalized;
+}
+
+export async function loadLocalDashboardConfig() {
+  let config = { dashboard: {}, groups: [], games: [], tools: [], notices: [] };
+
+  try {
+    const res = await fetch(`lessons/index.json?_=${Date.now()}`, { cache: "no-store" });
+    if (res.ok) config = await res.json();
+  } catch (err) {
+    console.error("Dashboard config load failed:", err);
+  }
+
+  return normalizeDashboardConfig(config);
 }
 
 export function loadCachedDashboardConfig() {

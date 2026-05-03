@@ -36,7 +36,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderList(getFilteredKeys());
         updateBar();
     });
+    document.getElementById('btn-clear-selected').addEventListener('click', () => {
+        selected.clear();
+        renderList(getFilteredKeys());
+        updateBar();
+    });
     document.getElementById('btn-print').addEventListener('click', goPrint);
+    updateBar();
 });
 
 /* ── CSV 파싱 ── */
@@ -127,10 +133,12 @@ function renderList(keys) {
         const gcId = 'gc-' + encodeId(groupName);
         const head = document.createElement('div');
         head.className = 'sel-group__head';
+        const groupCountClass = allGroupKeys.some(k => selected.has(k)) ? 'sel-group__count' : 'sel-group__count is-empty';
         head.innerHTML =
             '<span class="sel-group__label">' +
-                '(' + groupName + ')' +
-                '<span class="sel-group__count" id="' + gcId + '">' + countText(allGroupKeys) + '</span>' +
+                '<span class="sel-group__dot" style="background:' + groupColor(groupName) + '"></span>' +
+                '<span class="sel-group__name">' + escHtml(groupName) + '</span>' +
+                '<span class="' + groupCountClass + '" id="' + gcId + '">' + countText(allGroupKeys) + '</span>' +
             '</span>' +
             '<span class="sel-group__chevron">▼</span>';
         head.addEventListener('click', () => groupEl.classList.toggle('collapsed'));
@@ -239,9 +247,15 @@ function renderToc(groups) {
         button.addEventListener('click', () => {
             const target = document.getElementById(button.dataset.scrollTarget);
             if (!target) return;
+            toc.querySelectorAll('.sel-toc__item').forEach(item => item.classList.remove('active'));
+            const groupButton = button.closest('.sel-toc__group')?.querySelector('.sel-toc__item');
+            if (groupButton) groupButton.classList.add('active');
             target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     });
+
+    const firstItem = toc.querySelector('.sel-toc__item');
+    if (firstItem) firstItem.classList.add('active');
 }
 
 /* ── 카운트 ── */
@@ -252,7 +266,10 @@ function countText(keys) {
 
 function refreshCount(id, keys) {
     const el = document.getElementById(id);
-    if (el) el.textContent = countText(keys);
+    if (el) {
+        el.textContent = countText(keys);
+        el.classList.toggle('is-empty', keys.every(k => !selected.has(k)));
+    }
 }
 
 /* ── 유틸 ── */
@@ -263,8 +280,9 @@ function getFilteredKeys() {
 
 function updateBar() {
     const n = selected.size;
-    document.getElementById('sel-count').textContent = n + '개 선택됨';
+    document.getElementById('sel-count').innerHTML = '<strong>' + n + '개</strong> 선택됨';
     document.getElementById('btn-print').disabled = n === 0;
+    renderSelectionChips();
 }
 
 function encodeId(str) {
@@ -273,6 +291,37 @@ function encodeId(str) {
 
 function escHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderSelectionChips() {
+    const selectionBar = document.getElementById('sel-selection');
+    const chipCount = document.getElementById('sel-chip-count');
+    const chips = document.getElementById('sel-chips');
+    if (!selectionBar || !chipCount || !chips) return;
+
+    const ordered = allKeys.filter(k => selected.has(k));
+    selectionBar.hidden = ordered.length === 0;
+    chipCount.textContent = ordered.length + '개 선택됨';
+    chips.innerHTML = ordered.map(key => (
+        '<button class="sel-selection__chip" type="button" data-key="' + escHtml(key) + '" title="' + escHtml(key) + '">' +
+            '<span>' + escHtml(key) + '</span><em>×</em>' +
+        '</button>'
+    )).join('');
+
+    chips.querySelectorAll('[data-key]').forEach(button => {
+        button.addEventListener('click', () => {
+            selected.delete(button.dataset.key);
+            renderList(getFilteredKeys());
+            updateBar();
+        });
+    });
+}
+
+function groupColor(groupName) {
+    const colors = ['#1D9E75', '#534AB7', '#D85A30', '#0E78C7', '#A8477D', '#6A7A22'];
+    let hash = 0;
+    for (let i = 0; i < groupName.length; i++) hash = (hash + groupName.charCodeAt(i) * (i + 1)) % colors.length;
+    return colors[hash];
 }
 
 /* ── 인쇄 이동 ── */

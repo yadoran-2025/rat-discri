@@ -2,10 +2,10 @@
 
 body {
     font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #f4f6fb;
+    background: #f2f2f0;
     color: #1a1a2e;
     min-height: 100vh;
-    padding-bottom: 90px;
+    padding-bottom: 132px;
 }
 
 .sel-sidebar {
@@ -15,18 +15,16 @@ body {
 }
 
 .sel-sidebar__inner {
-    border: 1.5px solid #e8ecf2;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.88);
-    padding: 14px;
-    box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
+    padding: 0 6px;
 }
 
 .sel-sidebar__title {
-    margin-bottom: 10px;
-    color: #111;
-    font-size: 13px;
+    margin-bottom: 8px;
+    color: #aaa;
+    font-size: 10px;
     font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
 }
 
 .sel-toc {
@@ -63,20 +61,30 @@ body {
 
 .sel-toc__item {
     padding: 7px 8px;
-    color: #2563eb;
+    color: #333;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .sel-toc__subitem {
     padding: 5px 8px 5px 18px;
     font-size: 11px;
     font-weight: 700;
+    color: #888;
 }
 
 .sel-toc__item:hover,
 .sel-toc__subitem:hover {
-    background: #eff6ff;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.sel-toc__item.active {
+    background: #111;
+    color: #fff;
+}
+
+.sel-toc__item.active em {
+    color: rgba(255, 255, 255, 0.55);
 }
 
 .sel-toc em {
@@ -91,82 +99,156 @@ body {
 .sel-wrap {
     max-width: 780px;
     margin: 0 auto;
-    padding: 44px 20px 24px;
+    padding: 28px 20px 24px;
 }
 
 /* ── 대시보드 이동 버튼 (공통) ── */
 .back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  margin-bottom: 20px;
-  background: #fff;
-  border: 1.5px solid #dde1ea;
-  border-radius: 20px;
-  font-size: 13px;
+  gap: 4px;
+  padding: 5px 0;
+  background: transparent;
+  border: 0;
+  font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: #888;
   text-decoration: none;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: color 0.15s;
 }
 .back-btn:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-  background: #eff6ff;
+  color: #333;
 }
 
 /* ── 헤더 ── */
-.sel-header { margin-bottom: 32px; }
-.sel-header__accent {
-    width: 40px; height: 4px;
-    background: #2563eb;
-    border-radius: 2px;
-    margin-bottom: 14px;
+.sel-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
 }
-.sel-header__title { font-size: 24px; font-weight: 700; color: #111; margin-bottom: 6px; }
-.sel-header__sub   { font-size: 14px; color: #666; }
+.sel-header__title { font-size: 20px; font-weight: 800; color: #111; }
 
 /* ── 툴바 ── */
 .sel-toolbar {
-    display: flex; gap: 10px; align-items: center;
-    margin-bottom: 14px; flex-wrap: wrap;
+    display: flex; gap: 0; align-items: center;
+    margin-bottom: 10px;
+    background: #fff;
+    border: 1.5px solid #e4e4e2;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.sel-search-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding-right: 12px;
+    border-right: 1px solid #eee;
+}
+.sel-search-icon {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: #aaa;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 .sel-search {
-    flex: 1; min-width: 180px;
-    padding: 10px 14px;
-    border: 1.5px solid #dde1ea; border-radius: 8px;
-    font-size: 14px; font-family: inherit;
-    background: #fff; outline: none;
-    transition: border-color 0.15s;
+    flex: 1; min-width: 120px;
+    border: 0;
+    font-size: 13px; font-family: inherit;
+    background: transparent; outline: none;
 }
-.sel-search:focus { border-color: #2563eb; }
 
-.sel-toolbar__btns { display: flex; gap: 8px; }
+.sel-toolbar__btns { display: flex; gap: 2px; padding-left: 12px; }
 .sel-btn-minor {
-    padding: 9px 16px;
-    border: 1.5px solid #dde1ea; border-radius: 8px;
-    background: #fff; font-size: 13px; font-family: inherit;
-    color: #444; cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
+    padding: 5px 10px;
+    border: 0; border-radius: 6px;
+    background: transparent; font-size: 12px; font-family: inherit;
+    color: #777; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
 }
-.sel-btn-minor:hover { border-color: #2563eb; color: #2563eb; }
+.sel-btn-minor:hover { background: #f5f5f3; color: #333; }
+
+/* ── 선택 현황 ── */
+.sel-selection {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #111;
+    color: #fff;
+    font-size: 12px;
+}
+.sel-selection[hidden] {
+    display: none;
+}
+.sel-selection__count {
+    flex: 0 0 auto;
+    font-size: 13px;
+    font-weight: 800;
+}
+.sel-selection__chips {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+}
+.sel-selection__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 220px;
+    padding: 3px 9px;
+    border: 0;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+.sel-selection__chip span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sel-selection__chip em {
+    opacity: 0.65;
+    font-style: normal;
+}
+.sel-selection__chip:hover em {
+    opacity: 1;
+}
+.sel-selection__clear {
+    flex: 0 0 auto;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.55);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+.sel-selection__clear:hover {
+    color: #fff;
+}
 
 /* ── 헤더 입력 ── */
-.sel-meta { margin-bottom: 32px; }
-.sel-meta__label {
-    display: block; font-size: 11px; font-weight: 700;
-    color: #888; text-transform: uppercase; letter-spacing: 0.07em;
-    margin-bottom: 7px;
-}
 .sel-text-input {
-    width: 100%; padding: 10px 14px;
-    border: 1.5px solid #dde1ea; border-radius: 8px;
-    font-size: 14px; font-family: inherit;
-    background: #fff; outline: none;
+    width: 100%; padding: 8px 12px;
+    border: 1.5px solid #e4e4e2; border-radius: 7px;
+    font-size: 12px; font-family: inherit;
+    background: #fafafa; outline: none;
     transition: border-color 0.15s;
 }
-.sel-text-input:focus { border-color: #2563eb; }
+.sel-text-input:focus { border-color: #111; }
 
 /* ── 로딩 / 빈 결과 ── */
 .sel-loading, .sel-no-results {
@@ -177,34 +259,57 @@ body {
 /* ── 그룹 카드 ── */
 .sel-group {
     background: #fff;
-    border: 1.5px solid #e8ecf2;
-    border-radius: 12px;
-    margin-bottom: 14px;
+    border: 1.5px solid #e4e4e2;
+    border-radius: 10px;
+    margin-bottom: 10px;
     overflow: hidden;
     scroll-margin-top: 18px;
 }
 
 .sel-group__head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 13px 18px; cursor: pointer; user-select: none;
-    background: #fafbfd; border-bottom: 1.5px solid #e8ecf2;
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; cursor: pointer; user-select: none;
+    background: #fff;
     transition: background 0.1s;
 }
-.sel-group__head:hover { background: #eff6ff; }
+.sel-group__head:hover { background: #fafafa; }
 
 .sel-group__label {
     display: flex; align-items: center; gap: 10px;
-    font-size: 14px; font-weight: 700; color: #2563eb;
+    min-width: 0;
+    flex: 1;
+    font-size: 14px; font-weight: 800; color: #111;
 }
-.sel-group__count { font-size: 12px; font-weight: 400; color: #888; }
+.sel-group__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+}
+.sel-group__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sel-group__count {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #111;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
+.sel-group__count.is-empty {
+    background: #f0f0ee;
+    color: #aaa;
+}
 .sel-group__chevron { font-size: 11px; color: #aaa; transition: transform 0.2s; }
 .sel-group.collapsed .sel-group__chevron { transform: rotate(-90deg); }
 
 .sel-group__body {
-    padding: 12px 16px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
 }
 .sel-group.collapsed .sel-group__body { display: none; }
 
@@ -213,52 +318,50 @@ body {
 
 .sel-subgroup__head {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 12px; cursor: pointer; user-select: none;
-    background: #f4f6fb; border-radius: 8px;
+    padding: 7px 14px 7px 32px; cursor: pointer; user-select: none;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
     transition: background 0.1s;
 }
-.sel-subgroup__head:hover { background: #e8f0fe; }
+.sel-subgroup__head:hover { background: #f5f5f3; }
 
 .sel-subgroup__label {
     display: flex; align-items: center; gap: 8px;
-    font-size: 12px; font-weight: 700; color: #4b5563;
+    font-size: 11.5px; font-weight: 700; color: #888;
 }
 .sel-subgroup__count { font-size: 11px; font-weight: 400; color: #9ca3af; }
 .sel-subgroup__chevron { font-size: 10px; color: #bbb; transition: transform 0.2s; }
 .sel-subgroup.collapsed .sel-subgroup__chevron { transform: rotate(-90deg); }
 
 .sel-subgroup__body {
-    padding: 10px 6px 4px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
-    gap: 8px;
+    display: flex;
+    flex-direction: column;
 }
 .sel-subgroup.collapsed .sel-subgroup__body { display: none; }
 
 /* ── 항목 ── */
 .sel-item {
-    display: flex; align-items: flex-start; gap: 9px;
-    padding: 9px 11px; border-radius: 8px; cursor: pointer;
-    border: 1.5px solid transparent;
-    transition: background 0.1s, border-color 0.1s;
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px 9px 32px; cursor: pointer;
+    border-top: 1px solid #f5f5f3;
+    transition: background 0.1s;
 }
-.sel-item:hover { background: #f0f4ff; }
-.sel-item.selected { background: #eff6ff; border-color: #bfdbfe; }
+.sel-item:hover { background: #f9f9f7; }
+.sel-item.selected { background: #f0f7ff; }
 
 .sel-item input[type="checkbox"] {
-    width: 15px; height: 15px; margin-top: 1px;
-    accent-color: #2563eb; flex-shrink: 0; cursor: pointer;
+    width: 16px; height: 16px;
+    accent-color: #111; flex-shrink: 0; cursor: pointer;
 }
-.sel-item__key  { font-size: 12px; font-weight: 600; color: #222; line-height: 1.4; word-break: break-all; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.sel-item__key  { font-size: 13px; font-weight: 600; color: #222; line-height: 1.4; word-break: break-all; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .tag-badge {
     display: inline-block;
-    background: #f0f4f8;
-    color: #4a5568;
+    background: #f0f0ee;
+    color: #777;
     font-size: 10px;
     padding: 1px 6px;
     border-radius: 4px;
     font-weight: 500;
-    border: 1px solid #d1d5db;
     line-height: 1.2;
 }
 .sel-item__date { font-size: 11px; color: #999; margin-top: 2px; }
@@ -266,30 +369,59 @@ body {
 /* ── 하단 고정 바 ── */
 .sel-bar {
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: #fff; border-top: 1.5px solid #e8ecf2;
-    padding: 14px 24px;
-    display: flex; align-items: center; justify-content: space-between;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.07);
+    background: #fff; border-top: 1.5px solid #e4e4e2;
+    padding: 0 24px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
     z-index: 100;
 }
-.sel-bar__count { font-size: 14px; font-weight: 600; color: #555; }
+.sel-bar__main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 12px 0;
+}
+.sel-bar__count {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: #999;
+}
+.sel-bar__count strong {
+    color: #111;
+    font-size: 15px;
+}
 .sel-bar__btn {
     display: flex; align-items: center; gap: 8px;
-    padding: 11px 26px;
-    background: #2563eb; color: #fff;
-    border: none; border-radius: 24px;
-    font-size: 14px; font-weight: 600; font-family: inherit;
+    padding: 9px 20px;
+    background: #111; color: #fff;
+    border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 800; font-family: inherit;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+    transition: background 0.15s;
 }
 .sel-bar__btn:hover:not(:disabled) {
-    background: #1d4ed8;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+    background: #333;
 }
 .sel-bar__btn:disabled {
-    background: #94a3b8; box-shadow: none; cursor: default;
+    background: #e0e0de; color: #aaa; cursor: default;
+}
+.sel-bar__setup {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 10px 0 14px;
+    border-top: 1px solid #f0f0ee;
+}
+.sel-bar__setup-label {
+    flex: 0 0 auto;
+    color: #aaa;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
 }
 
 @media (min-width: 1200px) {
@@ -311,11 +443,72 @@ body {
 }
 
 @media (max-width: 700px) {
+    body {
+        padding-bottom: 176px;
+    }
+
     .sel-sidebar {
         margin-top: 12px;
     }
 
     .sel-sidebar__inner {
         padding: 12px;
+    }
+
+    .sel-wrap {
+        padding-top: 20px;
+    }
+
+    .sel-header {
+        flex-wrap: wrap;
+    }
+
+    .sel-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .sel-search-wrap {
+        padding-right: 0;
+        border-right: 0;
+    }
+
+    .sel-toolbar__btns {
+        justify-content: flex-end;
+        padding-left: 0;
+    }
+
+    .sel-selection {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .sel-selection__chips {
+        flex-basis: 100%;
+        order: 3;
+    }
+
+    .sel-item {
+        padding-left: 18px;
+    }
+
+    .sel-subgroup__head {
+        padding-left: 18px;
+    }
+
+    .sel-bar {
+        padding: 0 18px;
+    }
+
+    .sel-bar__main,
+    .sel-bar__setup {
+        max-width: none;
+    }
+
+    .sel-bar__setup {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 6px;
     }
 }
