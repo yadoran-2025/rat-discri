@@ -7,6 +7,14 @@ export const BLOCK_TYPE_GROUPS = [
 export const BLOCK_TYPES = BLOCK_TYPE_GROUPS.flatMap(([, types]) => types);
 export const LEGACY_BLOCK_TYPES = ["이미지곁글"];
 export const LOCAL_CACHE_KEY = "lessonAuthorDraft_v2";
+export const LOCAL_SLOT_CACHE_KEY = "lessonAuthorDraftSlots_v1";
+export const LOCAL_SAVE_SLOTS = [
+  ["slot-1", "저장칸 1"],
+  ["slot-2", "저장칸 2"],
+  ["slot-3", "저장칸 3"],
+  ["slot-4", "저장칸 4"],
+  ["slot-5", "저장칸 5"],
+];
 export const LAYOUT_OPTIONS = [["stack", "아래로 나열"], ["row", "옆으로 나열"], ["figure", "사진+인용"]];
 export const TEXT_FORMAT_HINT = "`### 절`은 작은 제목으로, `*굵게*`와 `%기울임%`은 보편 문법으로 표시됩니다.";
 export const MARKUP_GUIDE_TEXT = `## 장 제목

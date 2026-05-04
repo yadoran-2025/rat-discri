@@ -1,5 +1,5 @@
 import { applySavedDraft } from "./state.js";
-import { loadLocalDraft, refreshOutputs } from "./output.js";
+import { loadLocalDraft, refreshOutputs, renderSavedSlotMenu } from "./output.js";
 import { renderShell } from "./shell.js";
 import { bindRootEvents } from "./events.js";
 import { renderEditor } from "./editor.js";
@@ -12,4 +12,5 @@ renderShell();
 bindRootEvents();
 renderEditor();
 refreshOutputs();
+renderSavedSlotMenu();
 loadAssetIndex();

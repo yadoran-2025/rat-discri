@@ -1,5 +1,5 @@
 import { state } from "./state.js";
-import { LOCAL_CACHE_KEY } from "./constants.js";
+import { LOCAL_CACHE_KEY, LOCAL_SAVE_SLOTS, LOCAL_SLOT_CACHE_KEY } from "./constants.js";
 import { app } from "../state.js";
 import { renderBlock, renderBlockSeparator } from "../ui/blocks/index.js";
 import { escapeHtml } from "../utils.js";
@@ -186,38 +186,137 @@ export function downloadJson() {
   URL.revokeObjectURL(url);
 }
 
-export function saveLocalDraft() {
+export function saveLocalDraft(slotId = LOCAL_SAVE_SLOTS[0][0]) {
+  const slot = getSaveSlot(slotId);
+  const slots = readSlotStore();
+  slots[slot.id] = {
+    ...createDraftPayload(),
+    slotId: slot.id,
+    slotLabel: slot.label,
+  };
   try {
-    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({
-      ts: Date.now(),
-      lesson: state.lesson,
-      markupDrafts: state.markupDrafts,
-    }));
+    writeSlotStore(slots);
+    renderSavedSlotMenu();
   } catch (err) {
     console.warn("작업 저장 실패:", err);
   }
 }
 
-export function loadLocalDraft() {
+export function loadLocalDraft(slotId = null) {
+  if (slotId) {
+    const slots = readSlotStore();
+    return normalizeDraft(slots[slotId]);
+  }
+
+  const latestSlot = getSavedSlots()
+    .filter(slot => slot.savedAt)
+    .sort((a, b) => b.ts - a.ts)[0];
+  if (latestSlot) return loadLocalDraft(latestSlot.id);
+
   try {
     const raw = localStorage.getItem(LOCAL_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const lesson = parsed.lesson || null;
-    if (!isValidLessonDraft(lesson)) {
-      localStorage.removeItem(LOCAL_CACHE_KEY);
-      return null;
-    }
-    return {
-      lesson: normalizeLessonDraft(lesson),
-      markupDrafts: Array.isArray(parsed.markupDrafts) ? parsed.markupDrafts : [],
-    };
+    return normalizeDraft(raw ? JSON.parse(raw) : null);
   } catch {
     try {
       localStorage.removeItem(LOCAL_CACHE_KEY);
     } catch { }
     return null;
   }
+}
+
+export function renderSavedSlotMenu() {
+  renderSaveSlotSelect();
+
+  const list = document.getElementById("saved-slot-list");
+  if (!list) return;
+  const slots = getSavedSlots();
+  list.innerHTML = slots.map(slot => {
+    const title = slot.lessonTitle || "저장된 작업 없음";
+    const meta = slot.savedAt || "비어 있음";
+    return `
+      <button
+        class="save-slot-menu__item"
+        type="button"
+        data-action="load-local-slot"
+        data-slot="${escapeHtml(slot.id)}"
+        ${slot.savedAt ? "" : "disabled"}
+      >
+        <span class="save-slot-menu__label">${escapeHtml(slot.label)}</span>
+        <span class="save-slot-menu__title">${escapeHtml(title)}</span>
+        <span class="save-slot-menu__meta">${escapeHtml(meta)}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function renderSaveSlotSelect() {
+  const select = document.getElementById("save-slot-select");
+  if (!select) return;
+  const selected = select.value || LOCAL_SAVE_SLOTS[0][0];
+  select.innerHTML = getSavedSlots().map(slot => {
+    const label = slot.lessonTitle || slot.label;
+    return `<option value="${escapeHtml(slot.id)}">${escapeHtml(label)}</option>`;
+  }).join("");
+  select.value = getSaveSlot(selected).id;
+}
+
+export function getSavedSlots() {
+  const store = readSlotStore();
+  return LOCAL_SAVE_SLOTS.map(([id, label]) => {
+    const draft = store[id] || null;
+    const ts = Number(draft?.ts || 0);
+    return {
+      id,
+      label,
+      ts,
+      savedAt: ts ? formatSavedAt(ts) : "",
+      lessonTitle: draft?.lesson?.title || draft?.lesson?.id || "",
+    };
+  });
+}
+
+function createDraftPayload() {
+  return {
+    ts: Date.now(),
+    lesson: state.lesson,
+    markupDrafts: state.markupDrafts,
+  };
+}
+
+function getSaveSlot(slotId) {
+  const [id, label] = LOCAL_SAVE_SLOTS.find(([value]) => value === slotId) || LOCAL_SAVE_SLOTS[0];
+  return { id, label };
+}
+
+function readSlotStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_SLOT_CACHE_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSlotStore(slots) {
+  localStorage.setItem(LOCAL_SLOT_CACHE_KEY, JSON.stringify(slots));
+}
+
+function normalizeDraft(parsed) {
+  const lesson = parsed?.lesson || null;
+  if (!isValidLessonDraft(lesson)) return null;
+  return {
+    lesson: normalizeLessonDraft(lesson),
+    markupDrafts: Array.isArray(parsed.markupDrafts) ? parsed.markupDrafts : [],
+  };
+}
+
+function formatSavedAt(ts) {
+  return new Date(ts).toLocaleString("ko-KR", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function isValidLessonDraft(lesson) {

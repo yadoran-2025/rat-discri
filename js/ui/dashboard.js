@@ -90,6 +90,7 @@ function renderDashboard(root, config, state) {
     <div class="dashboard-shell">
       ${renderSidebar(config, items, state)}
       <main class="dashboard-main">
+        ${renderMobileNav(config, items, state)}
         ${renderMainHeader(config)}
         ${renderSearchAndFilters(items, filteredItems, state)}
         ${renderResults(filteredItems, state)}
@@ -199,6 +200,52 @@ function renderSidebar(config, items, state) {
         <span>새 수업 만들기</span>
       </a>
     </aside>
+  `;
+}
+
+function renderMobileNav(config, items, state) {
+  const tools = Array.isArray(config.tools) ? config.tools : [];
+  const toolsById = new Map(tools.filter(tool => tool?.id).map(tool => [tool.id, tool]));
+  const lessonCount = items.filter(item => item.kind === "lesson-group").length;
+  const gameCount = items.filter(item => item.kind === "game").length;
+  const recentCount = getRecentItems(items).length;
+  const toolLinks = SIDEBAR_TOOL_GROUPS
+    .flatMap(group => group.items)
+    .map(item => {
+      const tool = toolsById.get(item.id);
+      return tool ? renderToolLink(tool, item.icon) : "";
+    })
+    .filter(Boolean)
+    .join("");
+
+  return `
+    <div class="dashboard-mobile-nav" aria-label="모바일 대시보드 탐색">
+      <div class="dashboard-mobile-nav__head">
+        <span class="dashboard-mobile-nav__brand">
+          <span class="dashboard-brand__mark" aria-hidden="true">${renderScooterPictogram()}</span>
+          <span>
+            <span class="dashboard-brand__eyebrow">사회교육공동체</span>
+            <span class="dashboard-brand__name">BOOONG</span>
+          </span>
+        </span>
+        <a class="dashboard-mobile-nav__create" href="author.html">
+          ${renderSidebarIcon("plus")}
+          <span>새 수업</span>
+        </a>
+      </div>
+      <nav class="dashboard-mobile-nav__primary" aria-label="탐색">
+        ${renderNavButton({ section: "all", label: "전체", count: items.length, icon: "grid", state })}
+        ${renderNavButton({ section: "lesson", label: "수업", count: lessonCount, icon: "list", state })}
+        ${renderNavButton({ section: "game", label: "게임", count: gameCount, icon: "play", state })}
+        ${renderNavButton({ section: "recent", label: "최근", count: recentCount || "", icon: "clock", state })}
+      </nav>
+      ${toolLinks ? `
+        <details class="dashboard-mobile-tools">
+          <summary>도구</summary>
+          <div class="dashboard-mobile-tools__list">${toolLinks}</div>
+        </details>
+      ` : ""}
+    </div>
   `;
 }
 

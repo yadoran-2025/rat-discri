@@ -45,6 +45,7 @@ export function renderMarkupEditor(sectionIdx) {
               <span class="markup-help__row"><code>&lt;댓&gt;</code><span>댓글 칸</span></span>
               <span class="markup-help__group">객체</span>
               <span class="markup-help__row"><code>[[자료키]]</code><span>외부자료 호출</span></span>
+              <span class="markup-help__row"><code>[[https://...]]</code><span>링크 자료 호출</span></span>
               <span class="markup-help__row"><code>[[자료키==캡션]]</code><span>자료 캡션</span></span>
               <span class="markup-help__row"><code>[[a]] ~ [[b]]</code><span>자료 병렬 연결</span></span>
               <span class="markup-help__row"><code>{{텍스트}}</code><span>텍스트 박스</span></span>

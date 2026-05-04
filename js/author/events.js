@@ -5,7 +5,7 @@ import { removeCommonImage, renderEditor, writeField } from "./editor.js";
 import { getSectionMarkup, insertMarkupAssets, insertMarkupText, writeMarkupSource } from "./markup-editor.js";
 import { applyAssetSelection, closeAssetSearch, getDefaultAssetSource, handleExamAssetToggle, openAssetSearch, renderAssetResults, toggleAssetSelection, toggleExamOpenState } from "./assets.js";
 import { clearUploadAsset, copyUploadedAssetUrl, getClipboardImage, insertUploadedAssetUrl, prepareUploadFile, renderUploadPanel, setUploadStatus, uploadClipboardAsset, writeUploadField } from "./upload.js";
-import { copyJson, downloadJson, loadLocalDraft, refreshOutputs, saveLocalDraft } from "./output.js";
+import { copyJson, downloadJson, loadLocalDraft, refreshOutputs, renderSavedSlotMenu, saveLocalDraft } from "./output.js";
 import { createArrayItem, createBlankLesson, createBlock, createSection } from "./factory.js";
 import { addMaterialCaption, addQuoteMaterial, getPath, moveItem, removeMaterialCaption, setPath } from "./paths.js";
 import { cancelBlockSort, finishBlockSort, startBlockSort, updateBlockSort } from "./sort.js";
@@ -119,17 +119,21 @@ export function bindRootEvents() {
     const path = button.dataset.path;
 
     if (action === "save-local") {
-      saveLocalDraft();
-      toast("현재 작업을 브라우저에 저장했습니다.");
-    } else if (action === "load-local") {
-      const draft = loadLocalDraft();
-      if (!draft) return toast("저장된 작업이 없습니다.");
+      const slotSelect = document.getElementById("save-slot-select");
+      const slotId = slotSelect?.value || "";
+      saveLocalDraft(slotId);
+      toast("현재 작업을 선택한 저장칸에 저장했습니다.");
+    } else if (action === "load-local-slot") {
+      const draft = loadLocalDraft(button.dataset.slot || "");
+      if (!draft) return toast("해당 저장칸에 저장된 작업이 없습니다.");
       state.lesson = draft.lesson;
       state.markupDrafts = draft.markupDrafts || [];
       state.markupGeneratedFromJson = [];
       state.currentSection = 0;
       renderEditor();
       refreshOutputs();
+      renderSavedSlotMenu();
+      button.closest("details")?.removeAttribute("open");
       toast("저장된 작업을 불러왔습니다.");
     } else if (action === "reset") {
       state.lesson = createBlankLesson();

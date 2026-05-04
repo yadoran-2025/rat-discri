@@ -78,7 +78,10 @@ export function buildMaterial(material) {
   }
 
   if (material.kind === "link") {
-    return buildLinkMaterial(material.url || material.src || material.value || material.key, material.caption || material.title || "");
+    return buildLinkMaterial(material.url || material.src || material.value || material.key, {
+      title: material.title || material.key || "",
+      caption: material.caption || "",
+    });
   }
 
   const figure = document.createElement("figure");
@@ -93,28 +96,66 @@ export function buildMaterial(material) {
   return figure;
 }
 
-export function buildLinkMaterial(url, label = "") {
+export function buildLinkMaterial(url, options = {}) {
   const href = String(url || "").trim();
+  const config = typeof options === "string"
+    ? { title: options, caption: "" }
+    : options || {};
+  const canEmbed = /^https?:\/\//i.test(href);
   const article = document.createElement("article");
-  article.className = "material material--link-card";
+  article.className = "material material--link-card material--link-embed";
   article.dataset.url = href;
 
   let host = href;
   try {
     host = new URL(href).hostname.replace(/^www\./, "");
   } catch { }
+  const title = config.title || host || href;
+  const caption = config.caption || "";
 
   article.innerHTML = `
+    ${canEmbed ? `
+      <div class="material-link-card__embed" aria-label="${escapeHtml(title)} 미리보기">
+        <iframe
+          class="material-link-card__iframe"
+          src="${escapeHtml(href)}"
+          title="${escapeHtml(title)}"
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
+          referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+        <div class="material-link-card__fallback">
+          <span>이 자료는 현재 화면에서 바로 열리지 않을 수 있습니다.</span>
+        </div>
+      </div>
+    ` : ""}
     <a class="material-link-card__anchor" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">
       <span class="material-link-card__body">
-        <span class="material-link-card__title">${escapeHtml(label || host || href)}</span>
+        <span class="material-link-card__title">${escapeHtml(title)}</span>
         <span class="material-link-card__desc">${escapeHtml(host || "")}</span>
         <span class="material-link-card__url">${escapeHtml(href)}</span>
+        ${caption ? `<span class="material-link-card__caption">${escapeHtml(caption)}</span>` : ""}
       </span>
       <span class="material-link-card__thumb" hidden></span>
+      <span class="material-link-card__action">새 창으로 열기</span>
     </a>
   `;
-  hydrateLinkPreview(article, href, label);
+  const iframe = article.querySelector(".material-link-card__iframe");
+  if (iframe) {
+    const fallbackTimer = globalThis.setTimeout(() => {
+      if (!article.classList.contains("is-embed-loaded")) article.classList.add("is-embed-fallback");
+    }, 3500);
+    iframe.addEventListener("load", () => {
+      globalThis.clearTimeout(fallbackTimer);
+      article.classList.add("is-embed-loaded");
+      article.classList.remove("is-embed-fallback");
+    }, { once: true });
+    iframe.addEventListener("error", () => {
+      globalThis.clearTimeout(fallbackTimer);
+      article.classList.add("is-embed-fallback");
+    }, { once: true });
+  }
+  hydrateLinkPreview(article, href, config.title || "");
   return article;
 }
 

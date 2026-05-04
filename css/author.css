@@ -68,8 +68,115 @@ select {
 .author__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+
+.save-slot-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 13rem;
+  min-height: 2.25rem;
+  border: 1px solid #cfd8e6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 0.5rem 0 0.65rem;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.save-slot-picker select {
+  min-width: 8rem;
+  max-width: 16rem;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  outline: none;
+  text-overflow: ellipsis;
+}
+
+.save-slot-menu {
+  position: relative;
+}
+
+.save-slot-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.save-slot-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.save-slot-menu[open] > summary {
+  border-color: #1b6bff;
+  background: #eef4ff;
+  color: #0f4fcc;
+}
+
+.save-slot-menu__list {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 18rem;
+  border: 1px solid #cfd8e6;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.45rem;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+}
+
+.save-slot-menu__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.15rem 0.6rem;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0.55rem 0.65rem;
+  color: #334155;
+  text-align: left;
+}
+
+.save-slot-menu__item:not(:disabled):hover,
+.save-slot-menu__item:not(:disabled):focus-visible {
+  background: #eef4ff;
+  outline: none;
+}
+
+.save-slot-menu__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.save-slot-menu__label {
+  color: #0f4fcc;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.save-slot-menu__title {
+  overflow: hidden;
+  color: #111827;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-slot-menu__meta {
+  grid-column: 2;
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .author__layout {

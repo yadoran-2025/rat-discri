@@ -1,4 +1,5 @@
 import { root } from "./state.js";
+
 export function renderShell() {
   root.innerHTML = `
     <div class="author">
@@ -11,11 +12,16 @@ export function renderShell() {
           </div>
         </div>
         <div class="author__actions">
+          <label class="save-slot-picker">
+            <span>저장칸</span>
+            <select id="save-slot-select">
+            </select>
+          </label>
           <button class="btn" type="button" data-action="save-local">작업 저장</button>
-          <button class="btn" type="button" data-action="load-local">저장본 불러오기</button>
-          <button class="btn" type="button" data-action="reset">초기화</button>
-          <button class="btn" type="button" data-action="copy-json">JSON 복사</button>
-          <button class="btn btn--primary" type="button" data-action="download-json">JSON 다운로드</button>
+          <details class="save-slot-menu">
+            <summary class="btn">저장본 불러오기</summary>
+            <div class="save-slot-menu__list" id="saved-slot-list"></div>
+          </details>
         </div>
       </header>
 

@@ -6,6 +6,9 @@ import { appendMaterials, buildMaterial, resolveMaterial } from "./materials.js"
 import { buildImagePair } from "./media.js";
 import { buildAnswer } from "./quiz.js";
 import { appendAsides, asArray, buildTextElement, hasFlowAnswer, hasFlowComment, normalizeLayout, renderAsideHtml } from "./shared.js";
+
+const CASE_INLINE_OPTIONS = { accentStyle: "color: var(--text); --accent: var(--text)" };
+
 export function renderCallout(block, defaultStyle, blockIdx) {
   const style = block.style ?? defaultStyle;
 
@@ -36,8 +39,8 @@ export function renderCallout(block, defaultStyle, blockIdx) {
       blockIdx,
       variant: "case",
     });
-    else if (body) div.appendChild(buildTextElement("div", "case__text", formatInline(body)));
-    if (footer) div.appendChild(buildTextElement("div", "case__sub", formatInline(footer)));
+    else if (body) div.appendChild(buildTextElement("div", "case__text", formatCaseInline(body)));
+    if (footer) div.appendChild(buildTextElement("div", "case__sub", formatCaseInline(footer)));
   }
 
   if (!block.flow?.length) {
@@ -218,10 +221,16 @@ export function appendFlow(parent, flow, textClass, context = {}) {
     }
     const text = document.createElement("div");
     text.className = textClass;
-    text.innerHTML = formatInline(item.text || "");
+    text.innerHTML = context.variant === "case"
+      ? formatCaseInline(item.text || "")
+      : formatInline(item.text || "");
     parent.appendChild(text);
     appendAsides(parent, item.asides);
   });
+}
+
+function formatCaseInline(text) {
+  return formatInline(text, CASE_INLINE_OPTIONS);
 }
 
 export function appendCommentObject(parent, key, variant = "question", label = "학생 답변 보기") {

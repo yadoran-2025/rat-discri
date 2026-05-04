@@ -77,8 +77,12 @@ export function inferMaterialKind(value, explicitKind = "") {
  * - "- " 로 시작하는 줄 → <ul class="md-list"><li>
  * - "  - " (스페이스 2칸) 로 시작하는 줄 → 중첩 <ul> (1단 깊이)
  */
-export function formatInline(text) {
+export function formatInline(text, options = {}) {
   if (!text) return "";
+
+  const accentAttrs = options.accentStyle
+    ? ` style="${escapeHtml(options.accentStyle)}"`
+    : "";
 
   const lines = text.replace(/\t/g, "  ").split("\n");
   const inline = s => escapeHtml(s)
@@ -101,7 +105,7 @@ export function formatInline(text) {
 
     if (accentMatch) {
       closeOuterUl();
-      out += (out ? "<br>" : "") + `<span class="md-accent-line">${inline(accentMatch[1])}</span>`;
+      out += (out ? "<br>" : "") + `<span class="md-accent-line"${accentAttrs}>${inline(accentMatch[1])}</span>`;
     } else if (topMatch) {
       closeTopLi();
       if (!inUl) { if (out) out += "<br>"; out += '<ul class="md-list">'; inUl = true; }
