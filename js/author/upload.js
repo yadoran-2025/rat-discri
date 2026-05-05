@@ -17,9 +17,12 @@ export function legacyRenderUploadPanel() {
   const upload = state.upload;
   const targetLabel = getAssetTargetLabel();
   const endpointReady = Boolean(ASSET_UPLOAD_ENDPOINT.trim());
+  const hasText = Boolean(upload.text.trim());
   const preview = upload.dataUrl
     ? `<img class="asset-upload__preview-img" src="${escapeAttr(upload.dataUrl)}" alt="">`
-    : `<span class="asset-upload__placeholder">이미지를 여기에 붙여넣으세요</span>`;
+    : hasText
+      ? `<pre class="asset-upload__text-preview">${escapeHtml(upload.text)}</pre>`
+      : `<span class="asset-upload__placeholder">이미지나 텍스트를 여기에 붙여넣으세요</span>`;
   panel.innerHTML = `
     <div class="asset-upload" tabindex="0">
       <div class="asset-upload__head">
@@ -61,12 +64,21 @@ export function legacyRenderUploadPanel() {
 export function writeUploadField(target) {
   const field = target.dataset.uploadField;
   state.upload[field] = target.value;
+  if (field === "key" && target.value.trim()) state.upload.keyError = "";
+  if (field === "text" && target.value.trim()) {
+    state.upload.file = null;
+    state.upload.dataUrl = "";
+  }
 }
 
 export function getClipboardImage(clipboardData) {
   const items = [...(clipboardData?.items || [])];
   const item = items.find(entry => entry.kind === "file" && entry.type.startsWith("image/"));
   return item?.getAsFile() || null;
+}
+
+export function getClipboardText(clipboardData) {
+  return clipboardData?.getData("text/plain")?.trim() || "";
 }
 
 export async function legacyPrepareUploadFile(file) {
@@ -76,7 +88,7 @@ export async function legacyPrepareUploadFile(file) {
   }
   state.upload.file = file;
   state.upload.dataUrl = await readFileAsDataUrl(file);
-  if (!state.upload.key) state.upload.key = createAssetKey(file);
+  if (!state.upload.key) state.upload.key = legacyCreateAssetKey(file);
   state.upload.status = `${file.type || "image"} ready (${Math.round(file.size / 1024)} KB).`;
   renderUploadPanel();
 }
@@ -184,12 +196,13 @@ export function renderUploadPanel() {
   const endpointReady = Boolean(ASSET_UPLOAD_ENDPOINT.trim());
   const preview = upload.dataUrl
     ? `<img class="asset-upload__preview-img" src="${escapeAttr(upload.dataUrl)}" alt="">`
-    : `<span class="asset-upload__placeholder">이미지를 여기에 붙여넣으세요</span>`;
+    : `<span class="asset-upload__placeholder">이미지는 여기에 붙여넣으세요</span>`;
   const status = upload.status || (
     endpointReady
-      ? "이미지를 붙여넣고 JSON KEY를 확인한 뒤 확인을 누르세요."
+      ? "이미지는 위 박스에, 텍스트는 아래 입력창에 붙여넣고 자료 키를 입력한 뒤 확인을 누르세요."
       : "관리자 설정 필요: asset-config.js의 ASSET_UPLOAD_ENDPOINT에 Apps Script /exec URL을 넣어주세요."
   );
+  const keyError = upload.keyError || "";
   const uploadedLink = upload.lastUrl ? `
     <div class="asset-upload__link">
       <span class="asset-upload__link-label">Drive link</span>
@@ -212,8 +225,17 @@ export function renderUploadPanel() {
       </div>
       <div class="asset-upload__grid">
         <label class="field">
-          <span class="field__label">JSON KEY</span>
-          <input data-upload-field="key" value="${escapeAttr(upload.key)}" placeholder="asset-key">
+          <span class="field__label ${keyError ? "field__label--error" : ""}">자료 키</span>
+          <input class="field__input ${keyError ? "field__input--error" : ""}" data-upload-field="key" value="${escapeAttr(upload.key)}" placeholder="asset-key" aria-invalid="${keyError ? "true" : "false"}" aria-describedby="asset-upload-key-helper">
+          <span class="field__helper ${keyError ? "field__helper--error" : ""}" id="asset-upload-key-helper">${escapeHtml(keyError || "시트 A열에 들어갈 고유한 자료 키를 입력하세요.")}</span>
+        </label>
+        <label class="field">
+          <span class="field__label">텍스트 자료</span>
+          <textarea class="asset-upload__text-input field__input" data-upload-field="text" rows="7" placeholder="텍스트 자료는 여기에 붙여넣고 편집하세요.">${escapeHtml(upload.text || "")}</textarea>
+        </label>
+        <label class="field">
+          <span class="field__label">자료 설명</span>
+          <textarea class="asset-upload__description field__input" data-upload-field="description" rows="2" placeholder="시트 E열에 들어갈 설명">${escapeHtml(upload.description || "")}</textarea>
         </label>
       </div>
       <div class="asset-upload__actions">
@@ -234,7 +256,7 @@ export async function prepareUploadFile(file) {
   state.upload.file = file;
   try {
     state.upload.dataUrl = await readFileAsDataUrl(file);
-    if (!state.upload.key) state.upload.key = createAssetKey(file);
+    state.upload.text = "";
     state.upload.status = `${file.type || "image"} 준비됨 (${Math.round(file.size / 1024)} KB).`;
   } catch (err) {
     state.upload.file = null;
@@ -244,53 +266,57 @@ export async function prepareUploadFile(file) {
   renderUploadPanel();
 }
 
-export function createAssetKey(file) {
-  const base = (state.lesson.id || "asset")
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/gi, "-")
-    .replace(/^-+|-+$/g, "") || "asset";
-  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
-  const ext = (file.type.split("/")[1] || "image").replace("jpeg", "jpg");
-  return `${base}-${stamp}.${ext}`;
-}
-
 export async function uploadClipboardAsset() {
   const endpoint = ASSET_UPLOAD_ENDPOINT.trim();
   const upload = state.upload;
   const key = upload.key.trim();
+  const text = upload.text.trim();
+  const description = upload.description.trim();
   if (!endpoint) return setUploadStatus("관리자 설정 필요: ASSET_UPLOAD_ENDPOINT에 Apps Script /exec URL을 넣어주세요.");
-  if (!upload.file || !upload.dataUrl) return setUploadStatus("이미지를 먼저 붙여넣으세요.");
-  if (!key) return setUploadStatus("JSON KEY를 입력하세요.");
+  if ((!upload.file || !upload.dataUrl) && !text) return setUploadStatus("이미지나 텍스트를 먼저 붙여넣으세요.");
+  if (!key) {
+    upload.keyError = "자료 키를 입력해야 등록할 수 있습니다.";
+    setUploadStatus("자료 키를 입력하세요.");
+    renderUploadPanel();
+    document.querySelector("[data-upload-field='key']")?.focus();
+    return;
+  }
 
   upload.busy = true;
-  setUploadStatus("구글 드라이브에 올리는 중입니다...");
+  setUploadStatus(text ? "텍스트 자료를 시트에 등록하는 중입니다..." : "구글 드라이브에 올리는 중입니다...");
   try {
-    const imageBase64 = upload.dataUrl.split(",")[1] || "";
+    const isText = Boolean(text);
+    const imageBase64 = isText ? "" : upload.dataUrl.split(",")[1] || "";
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         key,
+        kind: isText ? "text" : "image",
+        text,
+        description,
+        reason: description,
         imageBase64,
-        mimeType: upload.file.type || "image/png",
+        mimeType: upload.file?.type || "image/png",
       }),
     });
-    const text = await response.text();
+    const responseText = await response.text();
     let data;
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(responseText);
     } catch {
-      throw new Error(text || "업로드 응답을 읽지 못했습니다.");
+      throw new Error(responseText || "업로드 응답을 읽지 못했습니다.");
     }
     if (!response.ok || !data.ok) throw new Error(data.error || `업로드 실패 (${response.status}).`);
-    const driveUrl = data.driveUrl || data.url;
-    if (!driveUrl) throw new Error("업로드 응답에 driveUrl이 없습니다.");
+    const driveUrl = data.driveUrl || data.url || "";
+    if (!isText && !driveUrl) throw new Error("업로드 응답에 driveUrl이 없습니다.");
 
     upsertAssetRow({
       key: data.key || key,
-      url: driveUrl,
+      kind: isText ? "text" : "image",
+      ...(isText ? { headline: key, body: text, source: description } : { url: driveUrl }),
       keywords: [],
-      reason: "",
+      reason: description,
     });
     clearExternalAssetCache();
     const uploadedKey = data.key || key;
@@ -298,7 +324,9 @@ export async function uploadClipboardAsset() {
     clearUploadAsset();
     state.upload.lastKey = uploadedKey;
     state.upload.lastUrl = driveUrl;
-    state.upload.status = "업로드했고 현재 입력칸에 JSON KEY를 넣었습니다. 아래 Drive 링크도 바로 사용할 수 있습니다.";
+    state.upload.status = isText
+      ? "텍스트 자료를 등록했고 현재 입력칸에 자료 키를 넣었습니다."
+      : "업로드했고 현재 입력칸에 자료 키를 넣었습니다. 아래 Drive 링크도 바로 사용할 수 있습니다.";
     renderEditor();
     refreshOutputs();
     renderAssetResults();
@@ -313,7 +341,10 @@ export async function uploadClipboardAsset() {
 export function clearUploadAsset() {
   state.upload.file = null;
   state.upload.dataUrl = "";
+  state.upload.text = "";
   state.upload.key = "";
+  state.upload.description = "";
+  state.upload.keyError = "";
   state.upload.lastKey = "";
   state.upload.lastUrl = "";
   state.upload.status = "";

@@ -134,10 +134,12 @@ export function buildLinkMaterial(url, options = {}) {
         <span class="material-link-card__title">${escapeHtml(title)}</span>
         <span class="material-link-card__desc">${escapeHtml(host || "")}</span>
         <span class="material-link-card__url">${escapeHtml(href)}</span>
-        ${caption ? `<span class="material-link-card__caption">${escapeHtml(caption)}</span>` : ""}
       </span>
       <span class="material-link-card__thumb" hidden></span>
-      <span class="material-link-card__action">새 창으로 열기</span>
+      <span class="material-link-card__footer">
+        ${caption ? `<span class="material-link-card__caption">${escapeHtml(caption)}</span>` : ""}
+        <span class="material-link-card__action">새 창으로 열기</span>
+      </span>
     </a>
   `;
   const iframe = article.querySelector(".material-link-card__iframe");

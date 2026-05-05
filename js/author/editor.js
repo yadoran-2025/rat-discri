@@ -2,7 +2,7 @@ import { state } from "./state.js";
 import { BLOCK_TYPE_GROUPS, BLOCK_TYPES, LAYOUT_OPTIONS, LEGACY_BLOCK_TYPES, TEXT_FORMAT_HINT } from "./constants.js";
 import { escapeHtml } from "../utils.js";
 import { renderMarkupEditor, validateCurrentMarkup } from "./markup-editor.js";
-import { getPath, setPath } from "./paths.js";
+import { deletePath, getPath, setPath } from "./paths.js";
 import { escapeAttr, focusPendingField, getDetailState, resizeTextareas } from "./dom.js";
 export function renderEditor() {
   renderMetaEditor();
@@ -383,6 +383,7 @@ export function writeField(target) {
   } else if (path.endsWith(".answerText")) {
     const answerPath = path.replace(/\.answerText$/, ".answer");
     setPath(answerPath, normalizeAnswer(target.value));
+    clearStaleFlowForTextEdit(answerPath);
   } else if (path.endsWith(".__commonImageInput")) {
     const value = target.value.trim();
     const basePath = path.replace(/\.__commonImageInput$/, "");
@@ -393,7 +394,15 @@ export function writeField(target) {
     }
   } else {
     setPath(path, target.value);
+    clearStaleFlowForTextEdit(path);
   }
+}
+
+export function clearStaleFlowForTextEdit(path) {
+  const blockPath = path.match(/^(.*\.blocks\.\d+)\.(?:body|text|footer|note|answer)$/)?.[1];
+  if (blockPath) deletePath(`${blockPath}.flow`);
+  const promptPath = path.match(/^(.*\.prompts\.\d+)\.(?:q|note|answer)$/)?.[1];
+  if (promptPath) deletePath(`${promptPath}.flow`);
 }
 
 export function readDisplayValue(path) {

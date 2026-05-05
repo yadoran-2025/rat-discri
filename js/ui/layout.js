@@ -40,6 +40,18 @@ export function buildAppShell() {
   appDiv.appendChild(aside);
   appDiv.appendChild(main);
   document.body.appendChild(appDiv);
+  bindInlineBlankToggles(main);
+}
+
+export function bindInlineBlankToggles(root) {
+  if (!root || root.dataset.inlineBlankBound === "true") return;
+  root.dataset.inlineBlankBound = "true";
+  root.addEventListener("click", event => {
+    const blank = event.target.closest(".inline-blank");
+    if (!blank || !root.contains(blank)) return;
+    blank.classList.toggle("is-revealed");
+    blank.setAttribute("aria-label", blank.classList.contains("is-revealed") ? "빈칸 숨기기" : "빈칸 보기");
+  });
 }
 
 /**

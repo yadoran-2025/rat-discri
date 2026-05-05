@@ -19,6 +19,18 @@ export function setPath(path, value) {
   current[parts.at(-1)] = value;
 }
 
+export function deletePath(path) {
+  const parts = normalizePath(path);
+  let current = windowProxyRoot();
+  for (const part of parts.slice(0, -1)) {
+    if (current == null) return;
+    current = current[part];
+  }
+  if (current && Object.prototype.hasOwnProperty.call(current, parts.at(-1))) {
+    delete current[parts.at(-1)];
+  }
+}
+
 export function normalizePath(path) {
   return path.replace(/^lesson\./, "").split(".").map(part => /^\d+$/.test(part) ? Number(part) : part);
 }

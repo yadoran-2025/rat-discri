@@ -4,7 +4,7 @@ import { stringifyLessonMarkup } from "../lesson-markup.js";
 import { removeCommonImage, renderEditor, writeField } from "./editor.js";
 import { getSectionMarkup, insertMarkupAssets, insertMarkupText, writeMarkupSource } from "./markup-editor.js";
 import { applyAssetSelection, closeAssetSearch, getDefaultAssetSource, handleExamAssetToggle, openAssetSearch, renderAssetResults, toggleAssetSelection, toggleExamOpenState } from "./assets.js";
-import { clearUploadAsset, copyUploadedAssetUrl, getClipboardImage, insertUploadedAssetUrl, prepareUploadFile, renderUploadPanel, setUploadStatus, uploadClipboardAsset, writeUploadField } from "./upload.js";
+import { clearUploadAsset, copyUploadedAssetUrl, getClipboardImage, getClipboardText, insertUploadedAssetUrl, prepareUploadFile, renderUploadPanel, setUploadStatus, uploadClipboardAsset, writeUploadField } from "./upload.js";
 import { copyJson, downloadJson, loadLocalDraft, refreshOutputs, renderSavedSlotMenu, saveLocalDraft } from "./output.js";
 import { createArrayItem, createBlankLesson, createBlock, createSection } from "./factory.js";
 import { addMaterialCaption, addQuoteMaterial, getPath, moveItem, removeMaterialCaption, setPath } from "./paths.js";
@@ -42,13 +42,20 @@ export function bindRootEvents() {
   root.addEventListener("paste", event => {
     const pasteZone = event.target.closest?.(".asset-upload");
     if (!pasteZone) return;
+    if (event.target.matches?.("[data-upload-field]")) return;
     const file = getClipboardImage(event.clipboardData);
-    if (!file) {
-      setUploadStatus("No image found in the clipboard.");
+    event.preventDefault();
+    if (file) {
+      prepareUploadFile(file);
       return;
     }
-    event.preventDefault();
-    prepareUploadFile(file);
+    const text = getClipboardText(event.clipboardData);
+    if (!text) return setUploadStatus("붙여넣을 이미지나 텍스트가 없습니다.");
+    state.upload.file = null;
+    state.upload.dataUrl = "";
+    state.upload.text = text;
+    state.upload.status = "텍스트 자료가 준비되었습니다.";
+    renderUploadPanel();
   });
 
   root.addEventListener("pointerdown", event => {
@@ -77,13 +84,13 @@ export function bindRootEvents() {
 
   root.addEventListener("change", event => {
     const target = event.target;
-    if (target.id === "preview-all") {
-      state.showAllPreview = target.checked;
-      refreshOutputs();
-      return;
-    }
     if (target.matches("[data-action='toggle-exam-asset']")) {
       handleExamAssetToggle(target);
+      return;
+    }
+    if (target.matches("[data-action='sort-assets']")) {
+      state.assetSort = target.value === "oldest" ? "oldest" : "latest";
+      renderAssetResults();
       return;
     }
     if (target.matches("[data-path]")) {
@@ -261,9 +268,13 @@ export function bindRootEvents() {
     } else if (action === "choose-asset-source") {
       state.assetSource = button.dataset.source || "media";
       state.assetSelection.clear();
+      if (state.assetSource !== "media") state.assetKindFilter = "all";
       if (state.assetSource === "exam") state.examSubject = state.examSubject || "경제";
       const queryInput = document.getElementById("asset-query");
       if (queryInput) queryInput.value = "";
+      renderAssetResults();
+    } else if (action === "choose-asset-kind") {
+      state.assetKindFilter = button.dataset.kind || "all";
       renderAssetResults();
     } else if (action === "choose-exam-subject") {
       state.examSubject = button.dataset.subject || "경제";

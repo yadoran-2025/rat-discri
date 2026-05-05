@@ -21,7 +21,7 @@ export async function loadAssetIndex() {
       const material = normalizeAssetColumns(columns);
       if (!material) return;
       map[material.key] = material;
-      rowsBySource[source].push({ ...material, assetSource: source });
+      rowsBySource[source].push({ ...material, assetSource: source, assetOrder: idx });
     });
   });
   state.assetRows = rowsBySource;
@@ -57,11 +57,13 @@ export function closeAssetSearch() {
 export function renderAssetResults() {
   const box = document.getElementById("asset-results");
   const bar = document.getElementById("asset-search-bar");
+  const filters = document.getElementById("asset-filter-toolbar");
   const tabs = document.getElementById("asset-source-tabs");
   const note = document.getElementById("asset-target-note");
   const queryInput = document.getElementById("asset-query");
   if (!box) return;
   renderAssetSourceTabs(tabs);
+  renderAssetFilterToolbar(filters);
   if (note) note.textContent = `현재 대상: ${getAssetTargetLabel()}`;
   if (queryInput) {
     queryInput.hidden = state.assetSource === "upload";
@@ -80,8 +82,10 @@ export function renderAssetResults() {
   }
   const query = (queryInput?.value || "").toLowerCase().trim();
   const sourceRows = state.assetRows[state.assetSource] || [];
-  const filteredRows = sourceRows.filter(row => !query || getAssetSearchText(row).includes(query));
-  const rows = filteredRows;
+  const filteredRows = sourceRows
+    .filter(row => state.assetSource !== "media" || state.assetKindFilter === "all" || row.kind === state.assetKindFilter)
+    .filter(row => !query || getAssetSearchText(row).includes(query));
+  const rows = sortAssetRows(filteredRows);
   if (!sourceRows.length) {
     box.innerHTML = `<p class="field__hint">외부자료 목록을 불러오는 중입니다.</p>`;
     return;
@@ -108,6 +112,39 @@ export function renderAssetSourceTabs(tabs) {
   `).join("");
 }
 
+export function renderAssetFilterToolbar(filters) {
+  if (!filters) return;
+  if (state.assetSource !== "media") {
+    filters.innerHTML = "";
+    filters.hidden = true;
+    return;
+  }
+  filters.hidden = false;
+  const kinds = [
+    ["all", "전체"],
+    ["image", "이미지"],
+    ["video", "비디오"],
+    ["text", "텍스트"],
+    ["link", "링크"],
+  ];
+  filters.innerHTML = `
+    <div class="asset-kind-tabs" role="group" aria-label="자료 유형">
+      ${kinds.map(([kind, label]) => `
+        <button class="asset-kind-tab ${state.assetKindFilter === kind ? "is-active" : ""}" type="button" data-action="choose-asset-kind" data-kind="${kind}">
+          ${label}
+        </button>
+      `).join("")}
+    </div>
+    <label class="asset-sort-select">
+      <span class="sr-only">자료 정렬</span>
+      <select data-action="sort-assets">
+        <option value="latest" ${state.assetSort === "latest" ? "selected" : ""}>최신순</option>
+        <option value="oldest" ${state.assetSort === "oldest" ? "selected" : ""}>오래된 순</option>
+      </select>
+    </label>
+  `;
+}
+
 export function renderMediaAssetResults(rows) {
   return rows.map(row => `
     <button class="asset-result ${state.assetSelection.has(row.key) ? "is-selected" : ""}" type="button" data-action="choose-asset" data-key="${escapeAttr(row.key)}">
@@ -118,6 +155,22 @@ export function renderMediaAssetResults(rows) {
       </span>
     </button>
   `).join("");
+}
+
+export function sortAssetRows(rows) {
+  const direction = state.assetSort === "oldest" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const ai = getAssetOrderValue(a);
+    const bi = getAssetOrderValue(b);
+    if (ai !== bi) return (ai - bi) * direction;
+    return String(a.key || "").localeCompare(String(b.key || "")) * direction;
+  });
+}
+
+export function getAssetOrderValue(row) {
+  if (Number.isFinite(row.assetCreatedAt)) return row.assetCreatedAt;
+  if (Number.isFinite(row.assetOrder)) return row.assetOrder;
+  return 0;
 }
 
 export function renderExamAssetResults(rows, forceOpen = false) {
@@ -271,7 +324,7 @@ export function getExamAssetSearchText(row) {
 }
 
 export function upsertAssetRow(row) {
-  const nextRow = { kind: "image", keywords: [], reason: "", ...row, assetSource: "media" };
+  const nextRow = { kind: "image", keywords: [], reason: "", ...row, assetSource: "media", assetCreatedAt: Date.now() };
   state.assetMap[row.key] = nextRow;
   const mediaRows = state.assetRows.media;
   const existing = mediaRows.find(asset => asset.key === row.key);

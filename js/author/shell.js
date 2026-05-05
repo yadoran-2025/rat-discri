@@ -62,10 +62,6 @@ export function renderShell() {
           <section class="panel">
             <div class="preview-toolbar">
               <h2 class="panel__title">실시간 미리보기</h2>
-              <label class="check-field">
-                <input type="checkbox" id="preview-all">
-                전체 보기
-              </label>
             </div>
             <div class="preview-stage">
               <div id="preview-errors"></div>
@@ -85,6 +81,7 @@ export function renderShell() {
           <div class="asset-source-tabs" id="asset-source-tabs"></div>
           <input class="asset-search__input" id="asset-query" type="search" placeholder="키, 설명, 키워드로 검색" autocomplete="off">
           <div class="asset-search__bar" id="asset-search-bar"></div>
+          <div class="asset-filter-toolbar" id="asset-filter-toolbar"></div>
           <div id="asset-upload-panel"></div>
           <div class="asset-results" id="asset-results"></div>
         </div>

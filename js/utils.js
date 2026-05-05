@@ -85,9 +85,18 @@ export function formatInline(text, options = {}) {
     : "";
 
   const lines = text.replace(/\t/g, "  ").split("\n");
-  const inline = s => escapeHtml(s)
-    .replace(/(^|[^\*])\*([^\*\n]+?)\*(?!\*)/g, "$1<strong>$2</strong>")
-    .replace(/%([^%\n]+?)%/g, "<em>$1</em>");
+  const inline = s => {
+    const blanks = [];
+    const withBlankTokens = escapeHtml(s).replace(/\^([^^\n]*\S[^^\n]*)\^/g, (_, answer) => {
+      const token = `\u0000BLANK${blanks.length}\u0000`;
+      blanks.push(`<button class="inline-blank" type="button" aria-label="빈칸 보기"><span>${answer}</span></button>`);
+      return token;
+    });
+    return withBlankTokens
+      .replace(/(^|[^\*])\*([^\*\n]+?)\*(?!\*)/g, "$1<strong>$2</strong>")
+      .replace(/%([^%\n]+?)%/g, "<em>$1</em>")
+      .replace(/\u0000BLANK(\d+)\u0000/g, (_, idx) => blanks[Number(idx)] || "");
+  };
 
   let out = "";
   let inUl = false;
