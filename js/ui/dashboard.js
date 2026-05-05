@@ -537,14 +537,16 @@ function renderResultRow(item) {
     <article class="dashboard-result-row" data-item-key="${escapeAttr(item.key)}">
       ${renderDisciplineBadge(item, "dashboard-result-row__discipline")}
       <span class="dashboard-result-row__body">
-        <span class="dashboard-result-row__title">
-          <span class="dashboard-result-row__title-text">${formatDashboardText(item.title)}</span>
-          ${item.lessonCount ? `<span class="dashboard-result-row__lesson-count">${escapeHtml(`${item.lessonCount}차시`)}</span>` : ""}
-          ${item.kind === "game" ? `<span class="dashboard-kind-badge dashboard-kind-badge--game">게임</span>` : ""}
-        </span>
-        <span class="dashboard-result-row__taxonomy">
-          ${item.meta.length ? `<span class="dashboard-result-row__meta">${escapeHtml(item.meta.join(" · "))}</span>` : ""}
-          ${renderSubjectChips(item)}
+        <span class="dashboard-result-row__title-line">
+          <span class="dashboard-result-row__title">
+            <span class="dashboard-result-row__title-text">${formatDashboardText(item.title)}</span>
+            ${item.lessonCount ? `<span class="dashboard-result-row__lesson-count">${escapeHtml(`${item.lessonCount}차시`)}</span>` : ""}
+          </span>
+          <span class="dashboard-result-row__taxonomy">
+            ${item.meta.length ? `<span class="dashboard-result-row__meta">${escapeHtml(item.meta.join(" · "))}</span>` : ""}
+            ${renderSubjectChips(item)}
+            ${item.kind === "game" ? `<span class="dashboard-kind-badge dashboard-kind-badge--game">게임</span>` : ""}
+          </span>
         </span>
         ${item.desc ? `<span class="dashboard-result-row__desc">${formatDashboardText(item.desc)}</span>` : ""}
       </span>
@@ -699,6 +701,7 @@ function bindDashboardEvents(root, config, state) {
 
   root.querySelectorAll("[data-action-key]").forEach(link => {
     link.addEventListener("click", event => {
+      if (event.detail > 0) link.blur();
       saveRecentKey(link.dataset.actionKey || "");
       trackDashboardActionClick(event, link);
     });

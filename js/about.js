@@ -106,7 +106,7 @@ function renderAbout() {
             </div>
             <div class="about__hero-note">
               <span>PUBLIC QUESTIONS</span>
-              <strong>배움이 모이는 장면을 수업으로 옮깁니다.</strong>
+              <strong>사람이 모이는 장면을 수업으로 옮깁니다.</strong>
             </div>
           </div>
         </header>
