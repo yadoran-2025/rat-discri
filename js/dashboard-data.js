@@ -232,6 +232,8 @@ function buildLessonGroups(groupRows, lessonRows) {
         discipline: row.discipline,
         subject: row.subject,
         school: row.school,
+        majorUnit: row["대단원"],
+        middleUnit: row["중단원"],
         title: row.group_title || (kind === "game" ? "게임" : "수업"),
         desc: row.desc || "",
         tag: kind === "game" ? "게임" : "",
@@ -257,6 +259,8 @@ function normalizeGroups(groups) {
       ...group,
       kind: normalizeKind(group.kind),
       makers,
+      majorUnit: normalizeUnitText(group.majorUnit || group["대단원"]),
+      middleUnit: normalizeUnitText(group.middleUnit || group["중단원"]),
       lessons: (group.lessons || []).map(lesson => {
         const lessonMakers = normalizeMakers(lesson.makers || lesson.maker);
         return {
@@ -273,6 +277,8 @@ function normalizeGames(games) {
     ...game,
     kind: "game",
     makers: normalizeMakers(game.makers || game.maker),
+    majorUnit: normalizeUnitText(game.majorUnit || game["대단원"]),
+    middleUnit: normalizeUnitText(game.middleUnit || game["중단원"]),
   }));
 }
 
@@ -312,6 +318,10 @@ function normalizeSheetText(value) {
     .replace(/\\n/g, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .trim();
+}
+
+function normalizeUnitText(value) {
+  return String(value || "").trim();
 }
 
 function isPublished(value) {

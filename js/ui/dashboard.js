@@ -102,6 +102,23 @@ function renderDashboard(root, config, state) {
   hydrateVisitStats(root, state);
 }
 
+function refreshSearchResults(root, config, state) {
+  const items = createLibraryItems(config);
+  normalizeState(items, state);
+  const filteredItems = getFilteredItems(items, state);
+
+  const countLabel = root.querySelector("[data-results-count]");
+  if (countLabel) countLabel.textContent = getResultLabel(state, filteredItems.length);
+
+  const currentResults = root.querySelector("[data-dashboard-results]");
+  if (currentResults) {
+    currentResults.outerHTML = renderResults(filteredItems, state);
+    bindDashboardActionEvents(root);
+  } else {
+    renderDashboard(root, config, state);
+  }
+}
+
 async function refreshDashboardConfig(root, currentConfig, state) {
   try {
     const nextConfig = await loadDashboardConfig({ cache: false });
@@ -434,7 +451,7 @@ function renderSearchAndFilters(items, filteredItems, state) {
         <div class="dashboard-results-actions">
           <label class="dashboard-sort-select" aria-label="정렬">
             <select data-sort-select>
-              <option value="default" ${state.sortMode === "default" ? "selected" : ""}>기본순</option>
+              <option value="default" ${state.sortMode === "default" ? "selected" : ""}>최신순</option>
               <option value="popular" ${state.sortMode === "popular" ? "selected" : ""}>인기순</option>
               <option value="date" ${state.sortMode === "date" ? "selected" : ""}>날짜순</option>
             </select>
@@ -447,7 +464,7 @@ function renderSearchAndFilters(items, filteredItems, state) {
       </div>
 
       <div class="dashboard-results-head">
-        <span>${escapeHtml(getResultLabel(state, filteredItems.length))}</span>
+        <span data-results-count>${escapeHtml(getResultLabel(state, filteredItems.length))}</span>
       </div>
     </section>
   `;
@@ -509,7 +526,7 @@ function renderFilterButton({ key, value, label, selected }) {
 function renderResults(items, state) {
   if (!items.length) {
     return `
-      <div class="empty-state dashboard-empty-state">
+      <div class="empty-state dashboard-empty-state" data-dashboard-results>
         <div class="empty-state__icon empty-state__icon--search" aria-hidden="true">?</div>
         <div class="empty-state__title">조건에 맞는 항목이 없습니다.</div>
         <div class="empty-state__desc">검색어나 필터를 조금 넓혀 다시 찾아보세요.</div>
@@ -519,14 +536,14 @@ function renderResults(items, state) {
 
   if (state.viewMode === "card") {
     return `
-      <section class="dashboard-card-grid" aria-label="수업 카드">
+      <section class="dashboard-card-grid" aria-label="수업 카드" data-dashboard-results>
         ${items.map(renderResultCard).join("")}
       </section>
     `;
   }
 
   return `
-    <section class="dashboard-result-list" aria-label="수업 목록">
+    <section class="dashboard-result-list" aria-label="수업 목록" data-dashboard-results>
       ${items.map(renderResultRow).join("")}
     </section>
   `;
@@ -537,15 +554,12 @@ function renderResultRow(item) {
     <article class="dashboard-result-row" data-item-key="${escapeAttr(item.key)}">
       ${renderDisciplineBadge(item, "dashboard-result-row__discipline")}
       <span class="dashboard-result-row__body">
+        ${renderTaxonomyLine(item, "dashboard-result-row__kicker", "dashboard-result-row__unit")}
         <span class="dashboard-result-row__title-line">
           <span class="dashboard-result-row__title">
             <span class="dashboard-result-row__title-text">${formatDashboardText(item.title)}</span>
-            ${item.lessonCount ? `<span class="dashboard-result-row__lesson-count">${escapeHtml(`${item.lessonCount}차시`)}</span>` : ""}
-          </span>
-          <span class="dashboard-result-row__taxonomy">
-            ${item.meta.length ? `<span class="dashboard-result-row__meta">${escapeHtml(item.meta.join(" · "))}</span>` : ""}
-            ${renderSubjectChips(item)}
             ${item.kind === "game" ? `<span class="dashboard-kind-badge dashboard-kind-badge--game">게임</span>` : ""}
+            ${item.lessonCount ? `<span class="dashboard-result-row__lesson-count">${escapeHtml(`${item.lessonCount}차시`)}</span>` : ""}
           </span>
         </span>
         ${item.desc ? `<span class="dashboard-result-row__desc">${formatDashboardText(item.desc)}</span>` : ""}
@@ -563,13 +577,11 @@ function renderResultCard(item) {
         ${item.kind === "game" ? `<b>게임</b>` : ""}
       </span>
       <span class="dashboard-library-card__body">
+        ${renderTaxonomyLine(item, "dashboard-library-card__kicker", "dashboard-library-card__unit")}
         <span class="dashboard-library-card__title">
           <span>${formatDashboardText(item.title)}</span>
+          ${item.kind === "game" ? `<span class="dashboard-kind-badge dashboard-kind-badge--game">게임</span>` : ""}
           ${item.lessonCount ? `<span class="dashboard-library-card__lesson-count">${escapeHtml(`${item.lessonCount}차시`)}</span>` : ""}
-        </span>
-        ${item.meta.length ? `<span class="dashboard-library-card__meta">${escapeHtml(item.meta.join(" · "))}</span>` : ""}
-        <span class="dashboard-library-card__tags">
-          ${renderSubjectChips(item)}
         </span>
         ${item.desc ? `<span class="dashboard-library-card__desc">${formatDashboardText(item.desc)}</span>` : ""}
       </span>
@@ -592,6 +604,25 @@ function renderSubjectChips(item) {
   return getItemSubjects(item, false)
     .map(subject => `<span class="chip">${escapeHtml(subject)}</span>`)
     .join("");
+}
+
+function renderTaxonomyLine(item, className, unitClassName) {
+  const subjectChips = renderSubjectChips(item);
+  const units = [normalizeUnitText(item.majorUnit), normalizeUnitText(item.middleUnit)].filter(Boolean);
+  if (!subjectChips && !units.length) return "";
+
+  const separator = `<span class="dashboard-taxonomy-separator" aria-hidden="true">-</span>`;
+  const unitParts = units
+    .map(unit => `<span class="${escapeAttr(unitClassName)}">${escapeHtml(unit)}</span>`)
+    .join(separator);
+
+  return `
+    <span class="${escapeAttr(className)}">
+      ${subjectChips}
+      ${subjectChips && unitParts ? separator : ""}
+      ${unitParts}
+    </span>
+  `;
 }
 
 function renderLessonPanel(item) {
@@ -685,8 +716,7 @@ function bindDashboardEvents(root, config, state) {
     queryInput.addEventListener("compositionend", event => {
       isComposing = false;
       state.query = event.target.value || "";
-      renderDashboard(root, config, state);
-      restoreQueryFocus(root);
+      refreshSearchResults(root, config, state);
     });
     queryInput.addEventListener("input", event => {
       if (isComposing || event.isComposing) {
@@ -694,26 +724,23 @@ function bindDashboardEvents(root, config, state) {
         return;
       }
       state.query = event.target.value || "";
-      renderDashboard(root, config, state);
-      restoreQueryFocus(root);
+      refreshSearchResults(root, config, state);
     });
   }
 
+  bindDashboardActionEvents(root);
+}
+
+function bindDashboardActionEvents(root) {
   root.querySelectorAll("[data-action-key]").forEach(link => {
+    if (link.dataset.dashboardActionBound === "true") return;
+    link.dataset.dashboardActionBound = "true";
     link.addEventListener("click", event => {
       if (event.detail > 0) link.blur();
       saveRecentKey(link.dataset.actionKey || "");
       trackDashboardActionClick(event, link);
     });
   });
-}
-
-function restoreQueryFocus(root) {
-  const nextInput = root.querySelector("[data-query-input]");
-  if (!nextInput) return;
-  nextInput.focus();
-  const length = nextInput.value.length;
-  nextInput.setSelectionRange(length, length);
 }
 
 function trackDashboardActionClick(event, link) {
@@ -761,6 +788,7 @@ function createGroupItem(group, index = 0) {
   const subjects = normalizeSubjects(group.subject, true);
   const subject = subjects[0] || "";
   const discipline = normalizeDiscipline(group.discipline || subject, true);
+  const meta = createUnitMeta(group);
 
   return {
     key: `group:${group.id || index}`,
@@ -776,10 +804,14 @@ function createGroupItem(group, index = 0) {
     color: getSubjectColor(discipline, index),
     actions,
     lessonCount: lessons.length,
-    meta: [],
+    majorUnit: normalizeUnitText(group.majorUnit),
+    middleUnit: normalizeUnitText(group.middleUnit),
+    meta,
     searchText: buildSearchText([
       group.title,
       group.desc,
+      group.majorUnit,
+      group.middleUnit,
       subjects.join(" "),
       discipline,
       schools.join(" "),
@@ -795,6 +827,7 @@ function createGameItem(game, index = 0) {
   const subject = subjects[0] || "";
   const discipline = normalizeDiscipline(game.discipline || subject, true);
   const actions = createGameActions(game, index, href);
+  const meta = createUnitMeta(game);
   const worksheetHref = getGameWorksheetHref(game);
   if (worksheetHref) {
     actions.push({
@@ -823,10 +856,14 @@ function createGameItem(game, index = 0) {
     discipline,
     color: getSubjectColor(discipline, index),
     actions,
-    meta: [],
+    majorUnit: normalizeUnitText(game.majorUnit),
+    middleUnit: normalizeUnitText(game.middleUnit),
+    meta,
     searchText: buildSearchText([
       game.title,
       game.desc,
+      game.majorUnit,
+      game.middleUnit,
       subjects.join(" "),
       discipline,
       schools.join(" "),
@@ -933,7 +970,7 @@ function sortItems(items, state) {
     return [...items].sort((a, b) => b.sortIndex - a.sortIndex);
   }
 
-  return [...items].sort((a, b) => a.sortIndex - b.sortIndex);
+  return [...items].sort((a, b) => b.sortIndex - a.sortIndex);
 }
 
 function createClickStatsByGroupId(stats = []) {
@@ -1097,6 +1134,17 @@ function splitList(value) {
 function getItemSubjects(item, useFallback) {
   if (Array.isArray(item?.subjects)) return item.subjects;
   return normalizeSubjects(item?.subject, useFallback);
+}
+
+function createUnitMeta(item) {
+  const majorUnit = normalizeUnitText(item?.majorUnit);
+  const middleUnit = normalizeUnitText(item?.middleUnit);
+  if (majorUnit && middleUnit) return [`${majorUnit} - ${middleUnit}`];
+  return [majorUnit || middleUnit].filter(Boolean);
+}
+
+function normalizeUnitText(value) {
+  return String(value || "").trim();
 }
 
 function getPrimarySubject(item) {
