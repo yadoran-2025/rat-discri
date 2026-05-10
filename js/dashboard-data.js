@@ -72,6 +72,16 @@ export function normalizeDashboardConfig(config = {}) {
   };
 }
 
+export function isJsonLessonUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  try {
+    return new URL(raw, "https://booong.local/").pathname.toLowerCase().endsWith(".json");
+  } catch {
+    return false;
+  }
+}
+
 export function createWorkMap(groups = [], games = []) {
   const map = new Map();
   groups.forEach(group => {
@@ -195,7 +205,8 @@ function buildLessonGroups(groupRows, lessonRows) {
         title: row.lesson_title || "수업",
         desc: row.desc || "",
         jsonPath: row.json_path || "",
-        link: getLessonRowLink(row),
+        link: getExternalLessonRowLink(row),
+        sourceUrl: getLessonRowSourceUrl(row),
         order: parseOrder(row.order),
         makers: lessonMakers.length ? lessonMakers : normalizeMakers(groupRow.maker),
       };
@@ -216,6 +227,7 @@ function buildLessonGroups(groupRows, lessonRows) {
       link: getLessonLink(lesson),
       href: lesson.link,
       jsonPath: lesson.jsonPath,
+      sourceUrl: lesson.sourceUrl,
       makers: lesson.makers,
     }));
   });
@@ -263,8 +275,13 @@ function normalizeGroups(groups) {
       middleUnit: normalizeUnitText(group.middleUnit || group["중단원"]),
       lessons: (group.lessons || []).map(lesson => {
         const lessonMakers = normalizeMakers(lesson.makers || lesson.maker);
+        const rowLink = lesson.link || lesson.href || "";
+        const sourceUrl = lesson.sourceUrl || (isJsonLessonUrl(rowLink) ? rowLink : "") || (isJsonLessonUrl(lesson.jsonPath) ? lesson.jsonPath : "");
         return {
           ...lesson,
+          link: isJsonLessonUrl(rowLink) ? "" : lesson.link,
+          href: isJsonLessonUrl(rowLink) ? "" : lesson.href,
+          sourceUrl,
           makers: lessonMakers.length ? lessonMakers : makers,
         };
       }),
@@ -299,6 +316,7 @@ function resolveMemberId(maker, aliasMap) {
 
 function getLessonLink(lesson) {
   if (lesson.link) return lesson.link;
+  if (lesson.id) return `?lesson=${encodeURIComponent(lesson.id)}`;
   if (!lesson.jsonPath) return "";
   const match = lesson.jsonPath.match(/(?:^|\/)([^/]+)\.json$/i);
   return match ? `?lesson=${encodeURIComponent(match[1])}` : "";
@@ -306,6 +324,17 @@ function getLessonLink(lesson) {
 
 function getLessonRowLink(row) {
   return row.link_url || row.link || row.href || row.url || row.game_link || row.main_link || "";
+}
+
+function getExternalLessonRowLink(row) {
+  const link = getLessonRowLink(row);
+  return isJsonLessonUrl(link) ? "" : link;
+}
+
+function getLessonRowSourceUrl(row) {
+  const link = getLessonRowLink(row);
+  if (isJsonLessonUrl(link)) return link;
+  return isJsonLessonUrl(row.json_path) ? row.json_path : "";
 }
 
 function normalizeHeader(value) {

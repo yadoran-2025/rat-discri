@@ -1,4 +1,5 @@
 import { loadExternalAssets } from "../api.js";
+import { loadDashboardConfig } from "../dashboard-data.js";
 import { app } from "../state.js";
 import { FULLSCREEN_TYPES, root, state } from "./state.js";
 import { render, renderLessonPicker, renderPreview, renderStatus, renderUnitCount } from "./render.js";
@@ -49,9 +50,7 @@ export async function loadLessons() {
   renderLessonPicker();
 
   try {
-    const res = await fetch(`lessons/index.json?_=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`lessons/index.json ${res.status}`);
-    const config = await res.json();
+    const config = await loadDashboardConfig({ cache: false });
     state.lessons = flattenLessons(config.groups || []);
     state.lessonsLoading = false;
     renderLessonPicker();
@@ -76,6 +75,7 @@ export function flattenLessons(groups) {
       groupTitle: stripHtml(group.title || ""),
       subject: stripHtml(group.subject || ""),
       school: stripHtml(group.school || ""),
+      sourceUrl: lesson.sourceUrl || "",
     })).filter(lesson => lesson.id);
   });
 }
@@ -102,8 +102,9 @@ export async function selectLesson(lessonId) {
   renderStatus(`${selected.label || selected.id} 데이터를 불러오는 중입니다.`);
 
   try {
-    const res = await fetch(`lessons/${encodeURIComponent(selected.id)}.json?_=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`${selected.id}.json ${res.status}`);
+    const source = selected.sourceUrl || `lessons/${encodeURIComponent(selected.id)}.json`;
+    const res = await fetch(withCacheBust(source), { cache: "no-store" });
+    if (!res.ok) throw new Error(`${source} ${res.status}`);
     state.selectedLesson = await res.json();
     app.lesson = state.selectedLesson;
     app.currentIdx = 0;
@@ -119,6 +120,11 @@ export async function selectLesson(lessonId) {
     render();
     renderStatus("lesson 데이터를 불러오지 못했습니다.");
   }
+}
+
+function withCacheBust(url) {
+  const separator = String(url).includes("?") ? "&" : "?";
+  return `${url}${separator}_=${Date.now()}`;
 }
 
 export function buildFullscreenUnits(lesson) {

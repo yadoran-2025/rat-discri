@@ -1,5 +1,6 @@
 import { app, clearListeners } from "./state.js";
 import { loadExternalAssets } from "./api.js";
+import { isJsonLessonUrl } from "./dashboard-data.js";
 import { loadDashboardConfig, showDashboard } from "./ui/dashboard.js";
 import { renderGuideGallery } from "./ui/guide-gallery.js";
 import { buildAppShell, renderSidebar, renderNavFooter, bindKeyboard, toggleFirstVisibleAnswer } from "./ui/layout.js";
@@ -21,11 +22,11 @@ async function init() {
     return;
   }
 
+  let lessonSource = `lessons/${lessonId}.json`;
   try {
-    const [lessonRes, dashboardConfig] = await Promise.all([
-      fetch(`lessons/${lessonId}.json?_=${Date.now()}`, { cache: "no-store" }),
-      loadDashboardConfig(),
-    ]);
+    const dashboardConfig = await loadDashboardConfig();
+    lessonSource = getLessonFetchSource(lessonId, dashboardConfig);
+    const lessonRes = await fetch(withCacheBust(lessonSource), { cache: "no-store" });
     if (!lessonRes.ok) throw new Error(`${lessonRes.status}`);
     app.lesson = await lessonRes.json();
     applyLessonMetadata(lessonId, dashboardConfig);
@@ -36,7 +37,7 @@ async function init() {
     document.body.innerHTML = `
       <div style="padding:3rem;font-family:sans-serif;">
         <h1>수업 자료를 불러오지 못했습니다</h1>
-        <p>파일: <code>lessons/${lessonId}.json</code></p>
+        <p>파일: <code>${escapeHtml(lessonSource)}</code></p>
         <p>오류: ${err.message}</p>
       </div>`;
     return;
@@ -61,6 +62,20 @@ function applyLessonMetadata(lessonId, config) {
     prev: meta?.prev ? getLessonTargetId(meta.prev) : app.lesson.prev || "",
     next: meta?.next ? getLessonTargetId(meta.next) : app.lesson.next || "",
   };
+}
+
+function getLessonFetchSource(lessonId, config) {
+  const meta = findLessonMetadata(lessonId, config);
+  const sourceUrl = meta?.lesson?.sourceUrl || "";
+  if (sourceUrl) return sourceUrl;
+  const legacyJsonPath = meta?.lesson?.jsonPath || "";
+  if (isJsonLessonUrl(legacyJsonPath)) return legacyJsonPath;
+  return `lessons/${encodeURIComponent(lessonId)}.json`;
+}
+
+function withCacheBust(url) {
+  const separator = String(url).includes("?") ? "&" : "?";
+  return `${url}${separator}_=${Date.now()}`;
 }
 
 function findLessonMetadata(lessonId, config) {
