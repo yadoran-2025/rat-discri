@@ -607,20 +607,39 @@ function renderSubjectChips(item) {
 }
 
 function renderTaxonomyLine(item, className, unitClassName) {
-  const subjectChips = renderSubjectChips(item);
-  const units = [normalizeUnitText(item.majorUnit), normalizeUnitText(item.middleUnit)].filter(Boolean);
-  if (!subjectChips && !units.length) return "";
+  const entries = getTaxonomyEntries(item);
+  if (!entries.length) return "";
 
+  const [primary, ...hiddenEntries] = entries;
+  return `
+    <span class="${escapeAttr(className)}">
+      ${renderTaxonomyEntry(primary, unitClassName)}
+      ${hiddenEntries.length ? renderTaxonomyMore(hiddenEntries, unitClassName) : ""}
+    </span>
+  `;
+}
+
+function renderTaxonomyEntry(entry, unitClassName) {
+  const subjectChip = entry.subject ? `<span class="chip">${escapeHtml(entry.subject)}</span>` : "";
+  const units = [entry.majorUnit, entry.middleUnit].filter(Boolean);
   const separator = `<span class="dashboard-taxonomy-separator" aria-hidden="true">-</span>`;
   const unitParts = units
     .map(unit => `<span class="${escapeAttr(unitClassName)}">${escapeHtml(unit)}</span>`)
     .join(separator);
+  return `${subjectChip}${subjectChip && unitParts ? separator : ""}${unitParts}`;
+}
 
+function renderTaxonomyMore(entries, unitClassName) {
   return `
-    <span class="${escapeAttr(className)}">
-      ${subjectChips}
-      ${subjectChips && unitParts ? separator : ""}
-      ${unitParts}
+    <span class="dashboard-taxonomy-more">
+      <button class="dashboard-taxonomy-more__button" type="button" aria-label="추가 단원 정보 ${entries.length}개">+${escapeHtml(entries.length)}</button>
+      <span class="dashboard-taxonomy-more__panel" role="tooltip">
+        ${entries.map(entry => `
+          <span class="dashboard-taxonomy-more__row">
+            ${renderTaxonomyEntry(entry, unitClassName)}
+          </span>
+        `).join("")}
+      </span>
     </span>
   `;
 }
@@ -804,6 +823,8 @@ function createGroupItem(group, index = 0) {
     color: getSubjectColor(discipline, index),
     actions,
     lessonCount: lessons.length,
+    majorUnits: splitList(group.majorUnit),
+    middleUnits: splitList(group.middleUnit),
     majorUnit: normalizeUnitText(group.majorUnit),
     middleUnit: normalizeUnitText(group.middleUnit),
     meta,
@@ -856,6 +877,8 @@ function createGameItem(game, index = 0) {
     discipline,
     color: getSubjectColor(discipline, index),
     actions,
+    majorUnits: splitList(game.majorUnit),
+    middleUnits: splitList(game.middleUnit),
     majorUnit: normalizeUnitText(game.majorUnit),
     middleUnit: normalizeUnitText(game.middleUnit),
     meta,
@@ -1128,7 +1151,7 @@ function normalizeDiscipline(discipline, useFallback) {
 }
 
 function splitList(value) {
-  return String(value || "").split(/[,;/|]+/).map(item => item.trim()).filter(Boolean);
+  return String(value || "").split(/[,\n;/|]+/).map(item => item.trim()).filter(Boolean);
 }
 
 function getItemSubjects(item, useFallback) {
@@ -1141,6 +1164,34 @@ function createUnitMeta(item) {
   const middleUnit = normalizeUnitText(item?.middleUnit);
   if (majorUnit && middleUnit) return [`${majorUnit} - ${middleUnit}`];
   return [majorUnit || middleUnit].filter(Boolean);
+}
+
+function getTaxonomyEntries(item) {
+  const subjects = getItemSubjects(item, false);
+  const majorUnits = Array.isArray(item?.majorUnits) ? item.majorUnits : splitList(item?.majorUnit);
+  const middleUnits = Array.isArray(item?.middleUnits) ? item.middleUnits : splitList(item?.middleUnit);
+  const count = Math.max(subjects.length, majorUnits.length, middleUnits.length);
+  if (!count) return [];
+
+  const entries = [];
+  const seen = new Set();
+  for (let index = 0; index < count; index += 1) {
+    const entry = {
+      subject: listValueAt(subjects, index),
+      majorUnit: listValueAt(majorUnits, index),
+      middleUnit: listValueAt(middleUnits, index),
+    };
+    const key = [entry.subject, entry.majorUnit, entry.middleUnit].join("\u0000");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push(entry);
+  }
+  return entries;
+}
+
+function listValueAt(values, index) {
+  if (!values.length) return "";
+  return values[index] || (values.length === 1 ? values[0] : "");
 }
 
 function normalizeUnitText(value) {
