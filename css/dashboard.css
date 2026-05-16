@@ -785,7 +785,7 @@
 
 .dashboard-result-row:hover,
 .dashboard-result-row:focus-visible {
-  z-index: 2;
+  z-index: 30;
   background: var(--color-surface-subtle, var(--bg-soft));
 }
 
@@ -1130,7 +1130,7 @@
 .dashboard-lesson-panel {
   display: grid;
   gap: var(--space-1);
-  align-content: center;
+  align-content: start;
   min-width: 0;
   padding: var(--space-3) var(--space-3);
   padding-left: var(--space-3);
@@ -1159,13 +1159,23 @@
 
 .dashboard-result-row .dashboard-lesson-panel {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  width: min(240px, 42%);
+  top: 50%;
+  right: var(--space-3);
+  z-index: 10;
+  width: min(320px, 42vw);
+  max-height: min(320px, calc(100vh - 160px));
+  overflow-y: auto;
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: var(--radius, 8px);
   background: var(--color-surface, var(--bg));
-  box-shadow: -10px 0 18px color-mix(in srgb, var(--color-surface, var(--bg)) 84%, transparent);
+  box-shadow: var(--shadow-md);
+  transform: translate(8px, -50%);
+  scrollbar-width: thin;
+}
+
+.dashboard-result-row:hover .dashboard-lesson-panel,
+.dashboard-result-row:focus-within .dashboard-lesson-panel {
+  transform: translate(0, -50%);
 }
 
 .dashboard-lesson-link {
@@ -1559,9 +1569,13 @@
     grid-column: 2;
     position: static;
     width: auto;
+    max-height: none;
+    overflow: visible;
     box-shadow: none;
   }
 
+  .dashboard-result-row:hover .dashboard-lesson-panel,
+  .dashboard-result-row:focus-within .dashboard-lesson-panel,
   .dashboard-lesson-panel {
     border-top: 1px solid var(--color-border, var(--border));
     border-left: 0;
